@@ -1,0 +1,70 @@
+#
+# Makefile for the output source package
+#
+
+ifeq ($(KERNELRELEASE),)
+
+MAKEFLAGS += --no-print-directory
+SHELL := /bin/bash
+BACKPORT_DIR := $(shell pwd)
+
+KMODDIR ?= updates
+ifneq ($(origin KLIB), undefined)
+KMODPATH_ARG := "INSTALL_MOD_PATH=$(KLIB)"
+else
+KLIB := /lib/modules/$(shell uname -r)/
+KMODPATH_ARG :=
+endif
+KLIB_BUILD ?= $(KLIB)/build/
+KERNEL_CONFIG := $(KLIB_BUILD)/.config
+KERNEL_MAKEFILE := $(KLIB_BUILD)/Makefile
+CONFIG_MD5 := $(shell md5sum $(KERNEL_CONFIG) 2>/dev/null | sed 's/\s.*//')
+
+export KLIB KLIB_BUILD BACKPORT_DIR KMODDIR KMODPATH_ARG
+
+# disable built-in rules for this file
+.SUFFIXES:
+
+# dkmsrpm-pkg
+# Creates Backports dkms package
+# command: make dkmsrpm-pkg
+# Rpm generated can be copied to client machine and install
+# will trigger source build and install on modules
+#----------------------------------------------------------------------------
+TAR_CONTENT := Makefile* drivers scripts backport-include
+DKMSMKSPEC := $(BACKPORT_DIR)/scripts/backport-mkdkmsspec
+DKMSMKCONF := $(BACKPORT_DIR)/scripts/backport-mkdkmsconf
+MODULE_NAME ?= intel-platform-cse-dkms
+ARCH := x86_64
+
+VERSION := 2022.7
+ifneq ($(BUILD_VERSION), )
+RELEASE := $(BUILD_VERSION)
+else
+$(error "$$BUILD_VERSION not set")
+endif
+
+DEB_ROOT_DIR := $(MODULE_NAME)-$(VERSION)/DEBIAN
+DEB_SRC_DIR := $(MODULE_NAME)-$(VERSION)/usr/src/$(MODULE_NAME)-$(VERSION)
+
+.PHONY: dkmsrpm-pkg dkmsdeb-pkg
+dkmsrpm-pkg:
+	$(CONFIG_SHELL) $(DKMSMKCONF) $(MODULE_NAME) $(VERSION) $(RELEASE) > $(BACKPORT_DIR)/dkms.conf
+	$(CONFIG_SHELL) $(DKMSMKSPEC) $(MODULE_NAME) $(VERSION) $(RELEASE) > $(BACKPORT_DIR)/$(MODULE_NAME).spec
+	tar -cz $(RCS_TAR_IGNORE) -f $(MODULE_NAME)-$(VERSION)-src.tar.gz \
+		$(TAR_CONTENT) $(MODULE_NAME).spec dkms.conf;
+	+rpmbuild $(RPMOPTS) --target $(ARCH) -ta $(MODULE_NAME)-$(VERSION)-src.tar.gz \
+	--define='_smp_mflags %{nil}'
+
+dkmsdeb-pkg:
+	mkdir -p $(DEB_ROOT_DIR)
+	echo -e "Package: CSE\nVersion: $(VERSION)\nArchitecture: `dpkg --print-architecture`\nMaintainer: Intel\nDescription: CSE driver" > $(DEB_ROOT_DIR)/control
+	echo -e "dkms add -m $(MODULE_NAME) -v $(VERSION)\ndkms autoinstall" > $(DEB_ROOT_DIR)/postinst
+	chmod 775 $(DEB_ROOT_DIR)/postinst
+	mkdir -p $(DEB_SRC_DIR)
+	$(CONFIG_SHELL) $(DKMSMKCONF) $(MODULE_NAME) $(VERSION) $(RELEASE) > $(DEB_SRC_DIR)/dkms.conf
+	$(CONFIG_SHELL) $(DKMSMKSPEC) $(MODULE_NAME) $(VERSION) $(RELEASE) > $(DEB_SRC_DIR)/$(MODULE_NAME).spec
+	cp -r $(TAR_CONTENT) $(DEB_SRC_DIR)
+
+	+dpkg-deb --root-owner-group --build $(MODULE_NAME)-$(VERSION)
+endif

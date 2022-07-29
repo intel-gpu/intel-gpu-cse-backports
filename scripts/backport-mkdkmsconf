@@ -1,0 +1,73 @@
+#!/bin/sh
+#
+# Creates a dkms.conf file
+
+if [ "$1"="" ]; then
+	PKG_NAME="$1"
+else
+	PKG_NAME="intel-platform-cse-dkms"
+fi
+
+if [ "$2"="" ]; then
+	PKG_VER="$2"
+else
+	PKG_VER="1.0"
+fi
+
+if [ "$3"="" ]; then
+	REL_NAME="$3"
+else
+	REL_NAME="1"
+fi
+
+# We can label the here-doc lines for conditional output to the conf file
+#
+# Labels:
+#  $ST: this line is added only when selftest is enabled
+#
+sed -e '/^DEL/d' -e 's/^\t*//' <<EOF
+	PACKAGE_NAME=$PKG_NAME
+	PACKAGE_VERSION=$PKG_VER-$REL_NAME
+	REMAKE_INITRD="no"
+	AUTOINSTALL="yes"
+
+	BUILT_MODULE_NAME[0]="mei"
+	BUILT_MODULE_LOCATION[0]="bin"
+	DEST_MODULE_LOCATION[0]="/updates"
+
+	BUILT_MODULE_NAME[1]="mei-me"
+	BUILT_MODULE_LOCATION[1]="bin"
+	DEST_MODULE_LOCATION[1]="/updates"
+
+	BUILT_MODULE_NAME[2]="mei-gsc"
+	BUILT_MODULE_LOCATION[2]="bin"
+	DEST_MODULE_LOCATION[2]="/updates"
+
+	BUILT_MODULE_NAME[3]="mei_wdt"
+	BUILT_MODULE_LOCATION[3]="bin"
+	DEST_MODULE_LOCATION[3]="/updates"
+
+        BUILT_MODULE_NAME[4]="mei_hdcp"
+        BUILT_MODULE_LOCATION[4]="bin"
+        DEST_MODULE_LOCATION[4]="/updates"
+
+        BUILT_MODULE_NAME[5]="mei_pxp"
+        BUILT_MODULE_LOCATION[5]="bin"
+        DEST_MODULE_LOCATION[5]="/updates"
+
+        BUILT_MODULE_NAME[6]="mei_iaf"
+        BUILT_MODULE_LOCATION[6]="bin"
+        DEST_MODULE_LOCATION[6]="/updates"
+
+	num_cpu_cores()
+	{
+	  if [ -x /usr/bin/nproc ]; then
+	    nproc
+	  else
+	    echo "1"
+	  fi
+	}
+
+	MAKE="'make' -j\$(num_cpu_cores) KDIR=/lib/modules/\$kernelver/build"
+	CLEAN="'make' clean"
+EOF
