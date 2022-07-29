@@ -28,11 +28,12 @@
  * @length: buffer length
  * @vtag: virtual tag
  * @mode: sending mode
+ * @timeout: send timeout for blocking writes, 0 for infinite timeout
  *
  * Return: written size bytes or < 0 on error
  */
 ssize_t __mei_cl_send(struct mei_cl *cl, const u8 *buf, size_t length, u8 vtag,
-		      unsigned int mode)
+		      unsigned int mode, unsigned long timeout)
 {
 	struct mei_device *bus;
 	struct mei_cl_cb *cb;
@@ -107,7 +108,7 @@ ssize_t __mei_cl_send(struct mei_cl *cl, const u8 *buf, size_t length, u8 vtag,
 		cb->buf.size = 0;
 	}
 
-	rets = mei_cl_write(cl, cb);
+	rets = mei_cl_write(cl, cb, timeout);
 
 	if (mode & MEI_CL_IO_SGL && rets == 0)
 		rets = length;
@@ -253,7 +254,7 @@ ssize_t mei_cldev_send_vtag(struct mei_cl_device *cldev, const u8 *buf,
 {
 	struct mei_cl *cl = cldev->cl;
 
-	return __mei_cl_send(cl, buf, length, vtag, MEI_CL_IO_TX_BLOCKING);
+	return __mei_cl_send(cl, buf, length, vtag, MEI_CL_IO_TX_BLOCKING, 0);
 }
 EXPORT_SYMBOL_GPL(mei_cldev_send_vtag);
 
@@ -909,7 +910,7 @@ ssize_t mei_cldev_send_gsc_command(struct mei_cl_device *cldev,
 	}
 
 	/* send the message to GSC */
-	ret = __mei_cl_send(cl, (u8 *)ext_hdr, buf_sz, 0, MEI_CL_IO_SGL);
+	ret = __mei_cl_send(cl, (u8 *)ext_hdr, buf_sz, 0, MEI_CL_IO_SGL, 0);
 	if (ret < 0) {
 		dev_err(bus->dev, "__mei_cl_send failed, returned %zd\n", ret);
 		goto end;
