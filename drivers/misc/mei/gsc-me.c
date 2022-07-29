@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright(c) 2019-2020, Intel Corporation. All rights reserved.
+ * Copyright(c) 2019-2022, Intel Corporation. All rights reserved.
  *
  * Intel Management Engine Interface (Intel MEI) Linux driver
  */
 
 #include <linux/module.h>
+#if IS_ENABLED(CONFIG_AUXILIARY_BUS)
+#include <linux/mei_aux.h>
+#else
 #include <linux/platform_device.h>
+#endif
 #include <linux/device.h>
 #include <linux/irqreturn.h>
 #include <linux/jiffies.h>
@@ -333,61 +337,52 @@ static const struct mei_hw_ops mei_gsc_hw_ops_null = {
 	.read = mei_gsc_read_slots_null
 };
 
-static int mei_gsc_probe(struct platform_device *platdev)
+#if IS_ENABLED(CONFIG_AUXILIARY_BUS)
+
+static int mei_gsc_probe(struct auxiliary_device *aux_dev,
+			 const struct auxiliary_device_id *aux_dev_id)
 {
+	struct mei_aux_device *adev = auxiliary_dev_to_mei_aux_dev(aux_dev);
 	struct mei_device *dev;
 	struct mei_me_hw *hw;
-	struct resource *bar;
-	struct resource *ext_op_mem = NULL;
 	struct device *device;
-	const struct platform_device_id *ent;
 	const struct mei_cfg *cfg;
 	int ret;
-	bool is_gsc_pxp = false;
-	int irq;
 
-	ent = platform_get_device_id(platdev);
-	cfg = mei_me_get_cfg(ent->driver_data);
+	cfg = mei_me_get_cfg(aux_dev_id->driver_data);
 	if (!cfg)
 		return -ENODEV;
 
-	device = &platdev->dev;
+	device = &aux_dev->dev;
 
-	irq = platform_get_irq_optional(platdev, 0);
-
-	dev = mei_me_dev_init(device, cfg, (irq < 0));
-	if (IS_ERR(dev)) {
-		ret = PTR_ERR(dev);
+	dev = mei_me_dev_init(device, cfg, adev->slow_fw);
+	if (!dev) {
+		ret = -ENOMEM;
 		goto err;
 	}
 
-	bar = platform_get_resource(platdev, IORESOURCE_MEM, 0);
-
 	hw = to_me_hw(dev);
-
-	hw->mem_addr = devm_ioremap_resource(device, bar);
+	hw->mem_addr = devm_ioremap_resource(device, &adev->bar);
 	if (IS_ERR(hw->mem_addr)) {
 		dev_err(device, "mmio not mapped\n");
 		ret = PTR_ERR(hw->mem_addr);
 		goto err;
 	}
 
-	hw->irq = irq;
-
+	hw->irq = adev->irq;
 	hw->read_fws = mei_gsc_read_hfs;
 
-	ext_op_mem = (struct resource *)platdev->dev.platform_data;
-	is_gsc_pxp = strcmp(cfg->kind, "gsc") == 0 && ext_op_mem;
-	if (is_gsc_pxp) {
-		mei_gsc_set_ext_op_mem(hw, ext_op_mem);
-		dev->ext_om = MEI_DEV_EXT_OM_INIT;
-	}
+	dev_set_drvdata(device, dev);
 
-	platform_set_drvdata(platdev, dev);
+	if (adev->ext_op_mem.start) {
+		mei_gsc_set_ext_op_mem(hw, &adev->ext_op_mem);
+		dev->pxp_mode = MEI_DEV_PXP_INIT;
+	}
 
 	/* use polling */
 	if (mei_me_hw_use_polling(hw)) {
 		mei_disable_interrupts(dev);
+		mei_clear_interrupts(dev);
 		init_waitqueue_head(&hw->wait_active);
 		hw->is_active = true; /* start in active mode for initialization */
 		hw->polling_thread = kthread_run(mei_me_polling_thread, dev,
@@ -427,11 +422,148 @@ static int mei_gsc_probe(struct platform_device *platdev)
 		goto register_err;
 
 	pm_runtime_put_noidle(device);
-
 	return 0;
 
 register_err:
 	mei_stop(dev);
+	if (!mei_me_hw_use_polling(hw))
+		devm_free_irq(device, hw->irq, dev);
+
+err:
+	dev_err(device, "probe failed: %d\n", ret);
+	dev_set_drvdata(device, NULL);
+	return ret;
+}
+
+static void mei_gsc_remove(struct auxiliary_device *aux_dev)
+{
+	struct mei_device *dev;
+	struct mei_me_hw *hw;
+
+	dev = dev_get_drvdata(&aux_dev->dev);
+	if (!dev)
+		return;
+
+	if (mei_gsc_hw_is_unavailable(&aux_dev->dev))
+		dev->ops = &mei_gsc_hw_ops_null;
+
+	mei_stop(dev);
+
+	hw = to_me_hw(dev);
+	if (mei_me_hw_use_polling(hw))
+		kthread_stop(hw->polling_thread);
+
+	mei_deregister(dev);
+
+	pm_runtime_disable(&aux_dev->dev);
+
+	mei_disable_interrupts(dev);
+	if (!mei_me_hw_use_polling(hw))
+		devm_free_irq(&aux_dev->dev, hw->irq, dev);
+}
+
+#else  /* IS_ENABLED(CONFIG_AUXILIARY_BUS) */
+
+static int mei_gsc_probe(struct platform_device *platdev)
+{
+	struct mei_device *dev;
+	struct mei_me_hw *hw;
+	struct resource *bar;
+	struct resource *ext_op_mem = NULL;
+	struct device *device;
+	const struct platform_device_id *ent;
+	const struct mei_cfg *cfg;
+	int ret;
+	bool is_gsc_pxp = false;
+	int irq;
+
+	ent = platform_get_device_id(platdev);
+	cfg = mei_me_get_cfg(ent->driver_data);
+	if (!cfg)
+		return -ENODEV;
+
+	device = &platdev->dev;
+
+	irq = platform_get_irq_optional(platdev, 0);
+
+	dev = mei_me_dev_init(device, cfg, (irq < 0));
+	if (!dev) {
+		ret = -ENOMEM;
+		goto err;
+	}
+
+	bar = platform_get_resource(platdev, IORESOURCE_MEM, 0);
+
+	hw = to_me_hw(dev);
+
+	hw->mem_addr = devm_ioremap_resource(device, bar);
+	if (IS_ERR(hw->mem_addr)) {
+		dev_err(device, "mmio not mapped\n");
+		ret = PTR_ERR(hw->mem_addr);
+		goto err;
+	}
+
+	hw->irq = irq;
+	hw->read_fws = mei_gsc_read_hfs;
+
+	ext_op_mem = (struct resource *)platdev->dev.platform_data;
+	is_gsc_pxp = strcmp(cfg->kind, "gsc") == 0 && ext_op_mem;
+	if (is_gsc_pxp) {
+		mei_gsc_set_ext_op_mem(hw, ext_op_mem);
+		dev->pxp_mode = MEI_DEV_PXP_INIT;
+	}
+
+	platform_set_drvdata(platdev, dev);
+
+	/* use polling */
+	if (mei_me_hw_use_polling(hw)) {
+		mei_disable_interrupts(dev);
+		mei_clear_interrupts(dev);
+		init_waitqueue_head(&hw->wait_active);
+		hw->is_active = true; /* start in active mode for initialization */
+		hw->polling_thread = kthread_run(mei_me_polling_thread, dev,
+						 "kmegscirqd/%s", dev_name(device));
+		if (IS_ERR(hw->polling_thread)) {
+			ret = PTR_ERR(hw->polling_thread);
+			dev_err(device, "unable to create kernel thread: %d\n", ret);
+			goto err;
+		}
+	} else {
+		ret = devm_request_threaded_irq(device, hw->irq,
+						mei_me_irq_quick_handler,
+						mei_me_irq_thread_handler,
+						IRQF_ONESHOT, KBUILD_MODNAME, dev);
+		if (ret) {
+			dev_err(device, "irq register failed %d\n", ret);
+			goto err;
+		}
+	}
+
+	pm_runtime_get_noresume(device);
+	pm_runtime_set_active(device);
+	pm_runtime_enable(device);
+
+	/* Continue to char device setup in spite of firmware handshake failure.
+	 * In order to provide access to the firmware status registers to the user
+	 * space via sysfs.
+	 */
+	if (mei_start(dev))
+		dev_warn(device, "init hw failure.\n");
+
+	pm_runtime_set_autosuspend_delay(device, MEI_GSC_RPM_TIMEOUT);
+	pm_runtime_use_autosuspend(device);
+
+	ret = mei_register(dev, device);
+	if (ret)
+		goto register_err;
+
+	pm_runtime_put_noidle(device);
+	return 0;
+
+register_err:
+	mei_stop(dev);
+	if (!mei_me_hw_use_polling(hw))
+		devm_free_irq(device, hw->irq, dev);
 
 err:
 	dev_err(device, "probe failed: %d\n", ret);
@@ -461,16 +593,19 @@ static int mei_gsc_remove(struct platform_device *platdev)
 
 	pm_runtime_disable(&platdev->dev);
 
+	mei_disable_interrupts(dev);
+	if (!mei_me_hw_use_polling(hw))
+		devm_free_irq(&platdev->dev, hw->irq, dev);
+
 	return 0;
 }
 
+#endif /* IS_ENABLED(CONFIG_AUXILIARY_BUS) */
+
 static int __maybe_unused mei_gsc_pm_suspend(struct device *device)
 {
-	struct mei_device *dev;
+	struct mei_device *dev = dev_get_drvdata(device);
 
-	dev_dbg(device, "suspend\n");
-
-	dev = dev_get_drvdata(device);
 	if (!dev)
 		return -ENODEV;
 
@@ -481,9 +616,42 @@ static int __maybe_unused mei_gsc_pm_suspend(struct device *device)
 	return 0;
 }
 
+#if IS_ENABLED(CONFIG_AUXILIARY_BUS)
+
 static int __maybe_unused mei_gsc_pm_resume(struct device *device)
 {
-	struct mei_device *dev;
+	struct mei_device *dev = dev_get_drvdata(device);
+	struct auxiliary_device *aux_dev;
+	struct mei_aux_device *adev;
+	int err;
+	struct mei_me_hw *hw;
+
+	if (!dev)
+		return -ENODEV;
+
+	hw = to_me_hw(dev);
+	aux_dev = to_auxiliary_dev(device);
+	adev = auxiliary_dev_to_mei_aux_dev(aux_dev);
+	if (adev->ext_op_mem.start) {
+		mei_gsc_set_ext_op_mem(hw, &adev->ext_op_mem);
+		dev->pxp_mode = MEI_DEV_PXP_INIT;
+	}
+
+	err = mei_restart(dev);
+	if (err)
+		return err;
+
+	/* Start timer if stopped in suspend */
+	schedule_delayed_work(&dev->timer_work, HZ);
+
+	return 0;
+}
+
+#else /* IS_ENABLED(CONFIG_AUXILIARY_BUS) */
+
+static int __maybe_unused mei_gsc_pm_resume(struct device *device)
+{
+	struct mei_device *dev = dev_get_drvdata(device);
 	int err;
 	struct resource *ext_op_mem;
 	struct platform_device *platdev;
@@ -492,9 +660,6 @@ static int __maybe_unused mei_gsc_pm_resume(struct device *device)
 	bool is_gsc_pxp = false;
 	struct mei_me_hw *hw;
 
-	dev_dbg(device, "resume\n");
-
-	dev = dev_get_drvdata(device);
 	if (!dev)
 		return -ENODEV;
 
@@ -510,7 +675,7 @@ static int __maybe_unused mei_gsc_pm_resume(struct device *device)
 	is_gsc_pxp = strcmp(cfg->kind, "gsc") == 0 && ext_op_mem;
 	if (is_gsc_pxp) {
 		mei_gsc_set_ext_op_mem(hw, ext_op_mem);
-		dev->ext_om = MEI_DEV_EXT_OM_INIT;
+		dev->pxp_mode = MEI_DEV_PXP_INIT;
 	}
 
 	err = mei_restart(dev);
@@ -523,13 +688,12 @@ static int __maybe_unused mei_gsc_pm_resume(struct device *device)
 	return 0;
 }
 
+#endif /* IS_ENABLED(CONFIG_AUXILIARY_BUS) */
+
 static int __maybe_unused mei_gsc_pm_runtime_idle(struct device *device)
 {
-	struct mei_device *dev;
+	struct mei_device *dev = dev_get_drvdata(device);
 
-	dev_dbg(device, "rpm: me: runtime_idle\n");
-
-	dev = dev_get_drvdata(device);
 	if (!dev)
 		return -ENODEV;
 	if (mei_write_is_idle(dev))
@@ -540,13 +704,10 @@ static int __maybe_unused mei_gsc_pm_runtime_idle(struct device *device)
 
 static int  __maybe_unused mei_gsc_pm_runtime_suspend(struct device *device)
 {
-	struct mei_device *dev;
+	struct mei_device *dev = dev_get_drvdata(device);
 	struct mei_me_hw *hw;
 	int ret;
 
-	dev_dbg(device, "rpm: me: runtime suspend\n");
-
-	dev = dev_get_drvdata(device);
 	if (!dev)
 		return -ENODEV;
 
@@ -565,20 +726,15 @@ static int  __maybe_unused mei_gsc_pm_runtime_suspend(struct device *device)
 
 	mutex_unlock(&dev->device_lock);
 
-	dev_dbg(device, "rpm: me: runtime suspend ret=%d\n", ret);
-
 	return ret;
 }
 
 static int __maybe_unused mei_gsc_pm_runtime_resume(struct device *device)
 {
-	struct mei_device *dev;
+	struct mei_device *dev = dev_get_drvdata(device);
 	struct mei_me_hw *hw;
 	irqreturn_t irq_ret;
 
-	dev_dbg(device, "rpm: me: runtime resume\n");
-
-	dev = dev_get_drvdata(device);
 	if (!dev)
 		return -ENODEV;
 
@@ -598,8 +754,6 @@ static int __maybe_unused mei_gsc_pm_runtime_resume(struct device *device)
 	if (irq_ret != IRQ_HANDLED)
 		dev_err(dev->dev, "thread handler fail %d\n", irq_ret);
 
-	dev_dbg(device, "rpm: me: runtime resume ret = 0\n");
-
 	return 0;
 }
 
@@ -610,6 +764,36 @@ static const struct dev_pm_ops mei_gsc_pm_ops = {
 			   mei_gsc_pm_runtime_resume,
 			   mei_gsc_pm_runtime_idle)
 };
+
+#if IS_ENABLED(CONFIG_AUXILIARY_BUS)
+static const struct auxiliary_device_id mei_gsc_id_table[] = {
+	{
+		.name = "i915.mei-gsc",
+		.driver_data = MEI_ME_GSC_CFG,
+
+	},
+	{
+		.name = "i915.mei-gscfi",
+		.driver_data = MEI_ME_GSCFI_CFG,
+	},
+	{
+		/* sentinel */
+	}
+};
+MODULE_DEVICE_TABLE(auxiliary, mei_gsc_id_table);
+
+static struct auxiliary_driver mei_gsc_driver = {
+	.probe	= mei_gsc_probe,
+	.remove = mei_gsc_remove,
+	.driver = {
+		/* auxiliary_driver_register() sets .name to be the modname */
+		.pm = &mei_gsc_pm_ops,
+	},
+	.id_table = mei_gsc_id_table
+};
+module_auxiliary_driver(mei_gsc_driver);
+
+#else /* IS_ENABLED(CONFIG_AUXILIARY_BUS) */
 
 static const struct platform_device_id gsc_devtypes[] = {
 	{
@@ -626,7 +810,7 @@ static const struct platform_device_id gsc_devtypes[] = {
 };
 
 static struct platform_driver mei_gsc_driver = {
-	.probe	= mei_gsc_probe,
+	.probe  = mei_gsc_probe,
 	.remove = mei_gsc_remove,
 	.driver = {
 		.name = "mei-gsc",
@@ -651,7 +835,15 @@ static void __exit mei_gsc_exit(void)
 }
 module_exit(mei_gsc_exit);
 
+#endif /* IS_ENABLED(CONFIG_AUXILIARY_BUS) */
+
 MODULE_AUTHOR("Intel Corporation");
+MODULE_LICENSE("GPL");
+
+#if IS_ENABLED(CONFIG_AUXILIARY_BUS)
+MODULE_ALIAS("auxiliary:i915.mei-gsc");
+MODULE_ALIAS("auxiliary:i915.mei-gscfi");
+#else
 MODULE_ALIAS("platform:mei-gsc");
 MODULE_ALIAS("platform:mei-gscfi");
-MODULE_LICENSE("GPL v2");
+#endif

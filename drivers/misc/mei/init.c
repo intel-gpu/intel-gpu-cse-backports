@@ -156,8 +156,16 @@ int mei_reset(struct mei_device *dev)
 
 	ret = mei_hw_start(dev);
 	if (ret) {
-		dev_err(dev->dev, "hw_start failed ret = %d\n", ret);
+		char fw_sts_str[MEI_FW_STATUS_STR_SZ];
+
+		mei_fw_status_str(dev, fw_sts_str, MEI_FW_STATUS_STR_SZ);
+		dev_err(dev->dev, "hw_start failed ret = %d fw status = %s\n", ret, fw_sts_str);
 		return ret;
+	}
+
+	if (dev->dev_state != MEI_DEV_RESETTING) {
+		dev_dbg(dev->dev, "wrong state = %d on link start\n", dev->dev_state);
+		return 0;
 	}
 
 	dev_dbg(dev->dev, "link is established start sending messages.\n");

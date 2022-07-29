@@ -160,7 +160,7 @@ int mei_cl_vt_support_check(const struct mei_cl *cl);
  *
  * Return: true if the host client is connected
  */
-static inline bool mei_cl_is_connected(struct mei_cl *cl)
+static inline bool mei_cl_is_connected(const struct mei_cl *cl)
 {
 	return  cl->state == MEI_FILE_CONNECTED;
 }
@@ -246,7 +246,7 @@ int mei_cl_connect(struct mei_cl *cl, struct mei_me_client *me_cl,
 int mei_cl_irq_connect(struct mei_cl *cl, struct mei_cl_cb *cb,
 		       struct list_head *cmpl_list);
 int mei_cl_read_start(struct mei_cl *cl, size_t length, const struct file *fp);
-ssize_t mei_cl_write(struct mei_cl *cl, struct mei_cl_cb *cb);
+ssize_t mei_cl_write(struct mei_cl *cl, struct mei_cl_cb *cb, unsigned long timeout);
 int mei_cl_irq_write(struct mei_cl *cl, struct mei_cl_cb *cb,
 		     struct list_head *cmpl_list);
 

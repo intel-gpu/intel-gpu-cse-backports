@@ -86,17 +86,17 @@ out:
 }
 DEFINE_SHOW_ATTRIBUTE(mei_dbgfs_active);
 
-static const char *mei_dev_pxp_mode(enum mei_dev_ext_om state)
+static const char *mei_dev_pxp_mode_str(enum mei_dev_pxp_mode state)
 {
-#define MEI_PXP_MODE(state) case MEI_DEV_EXT_OM_##state: return #state
-        switch (state) {
-        MEI_PXP_MODE(DISABLED);
-        MEI_PXP_MODE(INIT);
-        MEI_PXP_MODE(SETUP);
-        MEI_PXP_MODE(READY);
-        default:
+#define MEI_PXP_MODE(state) case MEI_DEV_PXP_##state: return #state
+	switch (state) {
+	MEI_PXP_MODE(DEFAULT);
+	MEI_PXP_MODE(INIT);
+	MEI_PXP_MODE(SETUP);
+	MEI_PXP_MODE(READY);
+	default:
 		return "unknown";
-        }
+	}
 #undef MEI_PXP_MODE
 }
 
@@ -127,7 +127,7 @@ static int mei_dbgfs_devstate_show(struct seq_file *m, void *unused)
 		   mei_pg_is_enabled(dev) ? "ENABLED" : "DISABLED",
 		   mei_pg_state_str(mei_pg_state(dev)));
 
-	seq_printf(m, "pxp:  %s\n", mei_dev_pxp_mode(dev->ext_om));
+	seq_printf(m, "pxp: %s\n", mei_dev_pxp_mode_str(dev->pxp_mode));
 
 	return 0;
 }

@@ -1951,10 +1951,11 @@ err:
  *
  * @cl: host client
  * @cb: write callback with filled data
+ * @timeout: send timeout for blocking writes, 0 for infinite timeout
  *
  * Return: number of bytes sent on success, <0 on failure.
  */
-ssize_t mei_cl_write(struct mei_cl *cl, struct mei_cl_cb *cb)
+ssize_t mei_cl_write(struct mei_cl *cl, struct mei_cl_cb *cb, unsigned long timeout)
 {
 	struct mei_device *dev;
 	struct mei_msg_data *buf;
@@ -2078,9 +2079,21 @@ out:
 	if (blocking && cl->writing_state != MEI_WRITE_COMPLETE) {
 
 		mutex_unlock(&dev->device_lock);
-		rets = wait_event_interruptible(cl->tx_wait,
-				cl->writing_state == MEI_WRITE_COMPLETE ||
-				(!mei_cl_is_connected(cl)));
+		if (timeout) {
+			rets = wait_event_interruptible_timeout(cl->tx_wait,
+					cl->writing_state == MEI_WRITE_COMPLETE ||
+					(!mei_cl_is_connected(cl)),
+					msecs_to_jiffies(timeout));
+			if (rets == 0)
+				rets = -ETIME;
+			if (rets > 0)
+				rets = 0;
+		} else {
+			rets = wait_event_interruptible(cl->tx_wait,
+					cl->writing_state == MEI_WRITE_COMPLETE ||
+					(!mei_cl_is_connected(cl)));
+		}
+
 		mutex_lock(&dev->device_lock);
 		/* wait_event_interruptible returns -ERESTARTSYS */
 		if (rets) {

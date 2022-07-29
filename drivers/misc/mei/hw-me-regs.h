@@ -123,9 +123,6 @@
 #define PCI_CFG_HFS_4         0x64
 #define PCI_CFG_HFS_5         0x68
 #  define GSC_CFG_HFS_5_BOOT_TYPE_MSK      0x00000003
-#  define GSC_CFG_HFS_5_BOOT_TYPE_UNKNOWN           0
-#  define GSC_CFG_HFS_5_BOOT_TYPE_CHASSIS_REGULAR   1
-#  define GSC_CFG_HFS_5_BOOT_TYPE_CHASSIS_EXTENDED  2
 #  define GSC_CFG_HFS_5_BOOT_TYPE_PXP               3
 #define PCI_CFG_HFS_6         0x6C
 

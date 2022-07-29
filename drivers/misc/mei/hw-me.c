@@ -525,14 +525,17 @@ static void mei_gsc_pxp_check(struct mei_device *dev)
 	struct mei_me_hw *hw = to_me_hw(dev);
 	u32 fwsts5 = 0;
 
-	if (dev->ext_om == MEI_DEV_EXT_OM_DISABLED)
+	if (dev->dev->offline)
+		return;
+
+	if (dev->pxp_mode == MEI_DEV_PXP_DEFAULT)
 		return;
 
 	hw->read_fws(dev, PCI_CFG_HFS_5, &fwsts5);
 	trace_mei_pci_cfg_read(dev->dev, "PCI_CFG_HFS_5", PCI_CFG_HFS_5, fwsts5);
 	if ((fwsts5 & GSC_CFG_HFS_5_BOOT_TYPE_MSK) == GSC_CFG_HFS_5_BOOT_TYPE_PXP) {
 		dev_dbg(dev->dev, "pxp mode is ready 0x%08x\n", fwsts5);
-		dev->ext_om = MEI_DEV_EXT_OM_READY;
+		dev->pxp_mode = MEI_DEV_PXP_READY;
 	} else {
 		dev_dbg(dev->dev, "pxp mode is not ready 0x%08x\n", fwsts5);
 	}
@@ -1324,6 +1327,8 @@ static int mei_me_hw_reset(struct mei_device *dev, bool intr_enable)
 			ret = mei_me_d0i3_exit_sync(dev);
 			if (ret)
 				return ret;
+		} else {
+			hw->pg_state = MEI_PG_OFF;
 		}
 	}
 
@@ -1434,8 +1439,8 @@ irqreturn_t mei_me_irq_thread_handler(int irq, void *dev_id)
 
 	/* check if ME wants a reset */
 	if (!mei_hw_is_ready(dev) && dev->dev_state != MEI_DEV_RESETTING) {
-		dev_warn(dev->dev, "FW not ready: resetting: dev_stat = %d ext_om %d\n",
-			 dev->dev_state, dev->ext_om);
+		dev_warn(dev->dev, "FW not ready: resetting: dev_state = %d pxp = %d\n",
+			 dev->dev_state, dev->pxp_mode);
 		if (dev->dev_state == MEI_DEV_POWERING_DOWN ||
 		    dev->dev_state == MEI_DEV_POWER_DOWN)
 			mei_cl_all_disconnect(dev);

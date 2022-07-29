@@ -62,12 +62,12 @@ enum mei_dev_state {
 	MEI_DEV_POWER_UP
 };
 
-/* MEI extended oprational memomory */
-enum mei_dev_ext_om {
-	MEI_DEV_EXT_OM_DISABLED = 0,
-	MEI_DEV_EXT_OM_INIT     = 1,
-	MEI_DEV_EXT_OM_SETUP    = 2,
-	MEI_DEV_EXT_OM_READY    = 3,
+/* MEI PXP mode state */
+enum mei_dev_pxp_mode {
+	MEI_DEV_PXP_DEFAULT = 0,
+	MEI_DEV_PXP_INIT    = 1,
+	MEI_DEV_PXP_SETUP   = 2,
+	MEI_DEV_PXP_READY   = 3,
 };
 
 const char *mei_dev_state_str(int state);
@@ -369,8 +369,8 @@ struct mei_hw_ops {
 /* MEI bus API*/
 void mei_cl_bus_rescan_work(struct work_struct *work);
 void mei_cl_bus_dev_fixup(struct mei_cl_device *dev);
-ssize_t __mei_cl_send(struct mei_cl *cl, u8 *buf, size_t length, u8 vtag,
-		      unsigned int mode);
+ssize_t __mei_cl_send(struct mei_cl *cl, const u8 *buf, size_t length, u8 vtag,
+		      unsigned int mode, unsigned long timeout);
 ssize_t __mei_cl_recv(struct mei_cl *cl, u8 *buf, size_t length, u8 *vtag,
 		      unsigned int mode, unsigned long timeout);
 bool mei_cl_bus_rx_event(struct mei_cl *cl);
@@ -467,6 +467,7 @@ struct mei_dev_timeouts {
  * @reset_count : number of consecutive resets
  * @dev_state   : device state
  * @hbm_state   : state of host bus message protocol
+ * @pxp_mode    : PXP device mode
  * @init_clients_timer : HBM init handshake timeout
  *
  * @pg_event    : power gating event
@@ -551,7 +552,7 @@ struct mei_device {
 	unsigned long reset_count;
 	enum mei_dev_state dev_state;
 	enum mei_hbm_state hbm_state;
-	enum mei_dev_ext_om ext_om;
+	enum mei_dev_pxp_mode pxp_mode;
 	u16 init_clients_timer;
 
 	/*
