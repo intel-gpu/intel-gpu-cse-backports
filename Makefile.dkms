@@ -37,7 +37,7 @@ DKMSMKCONF := $(BACKPORT_DIR)/scripts/backport-mkdkmsconf
 MODULE_NAME ?= intel-platform-cse-dkms
 ARCH := x86_64
 
-VERSION := 2022.7
+VERSION := 2022.22
 ifneq ($(BUILD_VERSION), )
 RELEASE := $(BUILD_VERSION)
 else
