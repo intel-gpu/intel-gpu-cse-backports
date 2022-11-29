@@ -60,7 +60,8 @@ dkmsdeb-pkg:
 	mkdir -p $(DEB_ROOT_DIR)
 	echo -e "Package: $(MODULE_NAME)\nVersion: $(VERSION)\nArchitecture: `dpkg --print-architecture`\nMaintainer: Intel\nDescription: CSE driver\nReplaces: CSE" > $(DEB_ROOT_DIR)/control
 	echo -e "dkms add -m $(MODULE_NAME) -v $(VERSION)\ndkms autoinstall" > $(DEB_ROOT_DIR)/postinst
-	chmod 775 $(DEB_ROOT_DIR)/postinst
+	echo -e "dkms remove -m $(MODULE_NAME)/$(VERSION) --all" > $(DEB_ROOT_DIR)/prerm
+	chmod 775 $(DEB_ROOT_DIR)/{postinst,prerm}
 	mkdir -p $(DEB_SRC_DIR)
 	$(CONFIG_SHELL) $(DKMSMKCONF) $(MODULE_NAME) $(VERSION) $(RELEASE) > $(DEB_SRC_DIR)/dkms.conf
 	$(CONFIG_SHELL) $(DKMSMKSPEC) $(MODULE_NAME) $(VERSION) $(RELEASE) > $(DEB_SRC_DIR)/$(MODULE_NAME).spec
