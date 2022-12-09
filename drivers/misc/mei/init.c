@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (c) 2012-2019, Intel Corporation. All rights reserved.
+ * Copyright (c) 2012-2022, Intel Corporation. All rights reserved.
  * Intel Management Engine Interface (Intel MEI) Linux driver
  */
 
@@ -88,6 +88,22 @@ void mei_cancel_work(struct mei_device *dev)
 }
 EXPORT_SYMBOL_GPL(mei_cancel_work);
 
+static void mei_save_fw_status(struct mei_device *dev)
+{
+	struct mei_fw_status fw_status;
+	int ret;
+
+	ret = mei_fw_status(dev, &fw_status);
+	if (ret) {
+		dev_err(dev->dev, "failed to read firmware status: %d\n", ret);
+		return;
+	}
+
+	dev->saved_dev_state = dev->dev_state;
+	dev->saved_fw_status_flag = true;
+	memcpy(&dev->saved_fw_status, &fw_status, sizeof(fw_status));
+}
+
 /**
  * mei_reset - resets host and fw.
  *
@@ -108,8 +124,14 @@ int mei_reset(struct mei_device *dev)
 		char fw_sts_str[MEI_FW_STATUS_STR_SZ];
 
 		mei_fw_status_str(dev, fw_sts_str, MEI_FW_STATUS_STR_SZ);
-		dev_warn(dev->dev, "unexpected reset: dev_state = %s fw status = %s\n",
-			 mei_dev_state_str(state), fw_sts_str);
+		if (kind_is_gsc(dev) || kind_is_gscfi(dev)) {
+			dev_dbg(dev->dev, "unexpected reset: dev_state = %s fw status = %s\n",
+				mei_dev_state_str(state), fw_sts_str);
+			mei_save_fw_status(dev);
+		} else {
+			dev_warn(dev->dev, "unexpected reset: dev_state = %s fw status = %s\n",
+				 mei_dev_state_str(state), fw_sts_str);
+		}
 	}
 
 	mei_clear_interrupts(dev);
@@ -217,16 +239,6 @@ int mei_start(struct mei_device *dev)
 
 	if (mei_hbm_start_wait(dev)) {
 		dev_err(dev->dev, "HBM haven't started");
-		goto err;
-	}
-
-	if (!mei_host_is_ready(dev)) {
-		dev_err(dev->dev, "host is not ready.\n");
-		goto err;
-	}
-
-	if (!mei_hw_is_ready(dev)) {
-		dev_err(dev->dev, "ME is not ready.\n");
 		goto err;
 	}
 
@@ -384,6 +396,7 @@ void mei_device_init(struct mei_device *dev,
 	init_waitqueue_head(&dev->wait_pg);
 	init_waitqueue_head(&dev->wait_hbm_start);
 	dev->dev_state = MEI_DEV_INITIALIZING;
+	init_waitqueue_head(&dev->wait_dev_state);
 	dev->reset_count = 0;
 
 	INIT_LIST_HEAD(&dev->write_list);
@@ -398,6 +411,8 @@ void mei_device_init(struct mei_device *dev,
 
 	bitmap_zero(dev->host_clients_map, MEI_CLIENTS_MAX);
 	dev->open_handle_count = 0;
+
+	dev->pxp_mode = MEI_DEV_PXP_DEFAULT;
 
 	/*
 	 * Reserving the first client ID
@@ -414,6 +429,8 @@ void mei_device_init(struct mei_device *dev,
 	dev->timeouts.client_init = MEI_CLIENTS_INIT_TIMEOUT;
 	dev->timeouts.pgi = mei_secs_to_jiffies(MEI_PGI_TIMEOUT);
 	dev->timeouts.d0i3 = mei_secs_to_jiffies(MEI_D0I3_TIMEOUT);
+	dev->timeouts.gt_forcewake = mei_secs_to_jiffies(MEI_GT_FORCEWAKE_TIMEOUT);
+	dev->timeouts.gt_forcewake_link = mei_secs_to_jiffies(MEI_GT_FORCEWAKE_LINK_TIMEOUT);
 	if (slow_fw) {
 		dev->timeouts.cl_connect = mei_secs_to_jiffies(MEI_CL_CONNECT_TIMEOUT_SLOW);
 		dev->timeouts.hbm = mei_secs_to_jiffies(MEI_HBM_TIMEOUT_SLOW);

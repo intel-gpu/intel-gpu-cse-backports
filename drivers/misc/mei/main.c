@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (c) 2003-2020, Intel Corporation. All rights reserved.
+ * Copyright (c) 2003-2022, Intel Corporation. All rights reserved.
  * Intel Management Engine Interface (Intel MEI) Linux driver
  */
 
@@ -1140,6 +1140,7 @@ void mei_set_devstate(struct mei_device *dev, enum mei_dev_state state)
 		return;
 
 	dev->dev_state = state;
+	wake_up(&dev->wait_dev_state);
 
 	clsdev = class_find_device(mei_class, NULL, &dev->cdev.dev, match_devt);
 	if (clsdev) {
