@@ -72,9 +72,14 @@ sed -e '/^DEL/d' -e 's/^\t*//' <<EOF
 
 	%post
 	/usr/sbin/dkms add -m %module -v %version --rpm_safe_upgrade
-	for i in /usr/src/linux-5.3.18*-obj/x86_64/{default,preempt}; do
-	K=\$(echo \$i|sed 's:^.*linux-\([^-]*-[^-]*\)-obj/x86_64/\([^$]*\):\1-\2:');
-	/usr/sbin/dkms install --force -m %module -v %version \$K
+	for i in /lib/modules/5.3*; do
+		H="\$i/build";
+		K=\$(echo \$i | cut -d '/' -f 4);
+		if [ -d \$H ]; then
+			/usr/sbin/dkms install --force -m %module -v %version -k \$K;
+		else
+			echo "SKIP DKMS Installation: kernel Headers not available for variant \$K";
+		fi
 	done
 	exit 0
 
