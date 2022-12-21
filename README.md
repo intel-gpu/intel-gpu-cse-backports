@@ -35,6 +35,7 @@ sudo apt install \
 
 #### Create debian package:
 ```
+export OS_TYPE=ubuntu_20.04
 BUILD_VERSION=1 make -f Makefile.dkms dkmsdeb-pkg
 ```
 
@@ -59,6 +60,8 @@ sudo zypper install \
 
 #### Build and install dkms package
 ```
+export OS_TYPE=sles
+export OS_VERSION=15sp4
 BUILD_VERSION=1 make -f Makefile.dkms dkmsrpm-pkg
 ```
 
@@ -96,6 +99,8 @@ make install-redhat
 
 #### Build and install dkms package
 ```
+export OS_TYPE=rhel_8
+export OS_VERSION="8.6"
 BUILD_VERSION=1 make -f Makefile.dkms dkmsrpm-pkg
 ```
 

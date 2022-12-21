@@ -1,0 +1,97 @@
+#!/bin/sh
+#
+#	Output a RPM spec file to generate CSE dkms source
+#
+
+if [ "$1"="" ]; then
+	PKG_NAME="$1"
+else
+	PKG_NAME="intel-platform-cse-dkms"
+fi
+
+if [ "$2"="" ]; then
+	PKG_VER="$2"
+else
+	PKG_VER="1.0"
+fi
+
+if [ "$3"="" ]; then
+	REL_NAME="$3"
+else
+	REL_NAME="1"
+fi
+
+KERNEL_PATTERN=$(sh scripts/generate_kernel_pattern.sh)
+
+sed -e '/^DEL/d' -e 's/^\t*//' <<EOF
+	%define module $PKG_NAME
+	%define version $PKG_VER
+	%define release $REL_NAME
+
+	Summary: Backports CSE Module DKMS Package
+	Name: %{module}
+	Version: %{version}
+	Release: %{release}
+	License: GPL
+	Group: System Environment/Base
+	BuildArch: x86_64
+	Vendor: Intel
+	Provides: %{module}
+	Packager: linux-graphics@intel.com
+	Requires: dkms gcc bash sed
+	# There is no Source# line for dkms.conf since it has been placed
+	# into the source tarball of SOURCE0
+	Source0: %{module}-%{version}-src.tar.gz
+	BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root/
+
+	%description
+	This RPM contains gentree output of the CSE backported module which is needed for building
+	.ko files
+
+	%prep
+	rm -rf %{module}-%{version}
+	mkdir %{module}-%{version}
+	cd %{module}-%{version}
+	tar xvzf \$RPM_SOURCE_DIR/%{module}-%{version}-src.tar.gz
+	./scripts/generate_osv_version_h.sh > backport-include/generated_osv_version.h
+
+	%install
+	if [ "%{buildroot}" != "/" ]; then
+		rm -rf %{buildroot}
+	fi
+	mkdir -p %{buildroot}/usr/src/%{module}-%{version}/
+	cp -rf %{module}-%{version}/* %{buildroot}/usr/src/%{module}-%{version}
+
+	%clean
+	if [ "%{buildroot}" != "/" ]; then
+		rm -rf %{buildroot}
+	fi
+
+	%files
+	%defattr (-, root, root)
+	/usr/src/%{module}-%{version}/
+
+	%pre
+
+	%post
+	/usr/sbin/dkms add -m %module -v %version --rpm_safe_upgrade
+	for i in /lib/modules/$KERNEL_PATTERN*; do
+		H="\$i/build";
+		K=\$(echo \$i | cut -d '/' -f 4);
+		if [ -d \$H ]; then
+			/usr/sbin/dkms install --force -m %module -v %version -k \$K;
+		else
+			echo "SKIP DKMS Installation: kernel Headers not available for variant \$K";
+		fi
+	done
+	cp %{buildroot}/usr/src/%{module}-%{version}/dkms.conf /var/lib/dkms/%{module}/%{version}/source/dkms.conf
+	exit 0
+
+	%preun
+	echo -e
+	echo -e "Uninstall of %{module} module (version %{version}-%{release}) beginning:"
+	/usr/sbin/dkms uninstall --force -m %{module} -v %{version}-%{release}
+	/usr/sbin/dkms remove -m %{module} -v %{version}-%{release} --all --rpm_safe_upgrade
+	echo -e "Uninstall done."
+	exit 0
+EOF
