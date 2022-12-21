@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
- * Copyright (c) 2003-2020, Intel Corporation. All rights reserved
+ * Copyright (c) 2003-2022, Intel Corporation. All rights reserved
  * Intel Management Engine Interface (Intel MEI) Linux driver
  */
 
@@ -26,6 +26,9 @@
 
 #define MKHI_RCV_TIMEOUT 500 /* receive timeout in msec */
 #define MKHI_RCV_TIMEOUT_SLOW 10000 /* receive timeout in msec, slow FW */
+
+#define MEI_GT_FORCEWAKE_TIMEOUT      1 /* Timeout to wait for FW reset after GT Forcewake */
+#define MEI_GT_FORCEWAKE_LINK_TIMEOUT 3 /* Timeout to wait for driver ready after GT Forcewake */
 
 /*
  * FW page size for DMA allocations

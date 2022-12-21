@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (c) 2003-2020, Intel Corporation. All rights reserved.
+ * Copyright (c) 2003-2022, Intel Corporation. All rights reserved.
  * Intel Management Engine Interface (Intel MEI) Linux driver
  */
 
@@ -568,6 +568,39 @@ static int mei_me_hw_ready_wait(struct mei_device *dev)
 }
 
 /**
+ * mei_me_check_fw_reset - check for the firmware reset error and exception conditions
+ *
+ * @dev: mei device
+ */
+static void mei_me_check_fw_reset(struct mei_device *dev)
+{
+	struct mei_fw_status fw_status;
+	int ret;
+	u32 fw_pm_event;
+
+	ret = mei_fw_status(dev, &fw_status);
+	if (ret) {
+		dev_err(dev->dev, "failed to read firmware status: %d\n", ret);
+		goto end;
+	}
+	fw_pm_event = fw_status.status[1] & FW_PM_EVENT_MASK;
+	if (fw_pm_event == FW_PM_CMOFF_TO_CMX_ERROR || fw_pm_event == FW_PM_CM_RESET_ERROR) {
+		if (dev->saved_fw_status_flag) {
+			char fw_sts_str[MEI_FW_STATUS_STR_SZ] = {0};
+
+			mei_fw_status2str(&dev->saved_fw_status, fw_sts_str, sizeof(fw_sts_str));
+			dev_warn(dev->dev, "unexpected reset: fw_pm_event = 0x%x, dev_state = %u fw status = %s\n",
+				 fw_pm_event, dev->saved_dev_state, fw_sts_str);
+		} else {
+			dev_warn(dev->dev, "unexpected reset: fw_pm_event = 0x%x\n", fw_pm_event);
+		}
+	}
+
+end:
+	dev->saved_fw_status_flag = false;
+}
+
+/**
  * mei_me_hw_start - hw start routine
  *
  * @dev: mei device
@@ -580,8 +613,10 @@ static int mei_me_hw_start(struct mei_device *dev)
 	if (dev->dev->offline)
 		return 0;
 
-	ret = mei_me_hw_ready_wait(dev);
+	if (kind_is_gsc(dev) || kind_is_gscfi(dev))
+		mei_me_check_fw_reset(dev);
 
+	ret = mei_me_hw_ready_wait(dev);
 	if (ret)
 		return ret;
 	dev_dbg(dev->dev, "hw is ready\n");
@@ -1158,7 +1193,7 @@ static int mei_me_d0i3_exit_sync(struct mei_device *dev)
 	mutex_unlock(&dev->device_lock);
 	wait_event_timeout(dev->wait_pg,
 		dev->pg_event == MEI_PG_EVENT_INTR_RECEIVED,
-		dev->timeouts.pgi);
+		dev->timeouts.d0i3);
 	mutex_lock(&dev->device_lock);
 
 	if (dev->pg_event != MEI_PG_EVENT_INTR_RECEIVED) {
@@ -1374,8 +1409,47 @@ static int mei_me_hw_reset(struct mei_device *dev, bool intr_enable)
 			if (ret)
 				return ret;
 		}
+		mei_forcewake_put(dev);
 	}
 	return 0;
+}
+
+/**
+ * mei_gt_forcewake_get - grab gt forcewake for the client
+ *
+ * @dev: the device structure
+ *
+ * Return: forcewake_count before increase
+ */
+static int mei_gt_forcewake_get(struct mei_device *dev)
+{
+	struct mei_me_hw *hw = to_me_hw(dev);
+
+	if (!hw->forcewake_get)
+		return 0;
+	dev_dbg(dev->dev, "Forcewake get %d\n", dev->forcewake_count);
+	hw->forcewake_get(hw->gsc);
+	return dev->forcewake_count++;
+}
+
+/**
+ * mei_gt_forcewake_put - release gt forcewake for the client
+ *
+ * @dev: the device structure
+ *
+ * Return: forcewake_count before decrease
+ */
+static int mei_gt_forcewake_put(struct mei_device *dev)
+{
+	struct mei_me_hw *hw = to_me_hw(dev);
+
+	if (!hw->forcewake_put)
+		return 0;
+	dev_dbg(dev->dev, "Forcewake put %d\n", dev->forcewake_count);
+	if (dev->forcewake_count <= 0)
+		return 0;
+	hw->forcewake_put(hw->gsc);
+	return dev->forcewake_count--;
 }
 
 /**
@@ -1439,8 +1513,13 @@ irqreturn_t mei_me_irq_thread_handler(int irq, void *dev_id)
 
 	/* check if ME wants a reset */
 	if (!mei_hw_is_ready(dev) && dev->dev_state != MEI_DEV_RESETTING) {
-		dev_warn(dev->dev, "FW not ready: resetting: dev_state = %d pxp = %d\n",
-			 dev->dev_state, dev->pxp_mode);
+		if (kind_is_gsc(dev) || kind_is_gscfi(dev)) {
+			dev_dbg(dev->dev, "FW not ready: resetting: dev_state = %d\n",
+				dev->dev_state);
+		} else {
+			dev_warn(dev->dev, "FW not ready: resetting: dev_state = %d\n",
+				 dev->dev_state);
+		}
 		if (dev->dev_state == MEI_DEV_POWERING_DOWN ||
 		    dev->dev_state == MEI_DEV_POWER_DOWN)
 			mei_cl_all_disconnect(dev);
@@ -1515,6 +1594,22 @@ EXPORT_SYMBOL_GPL(mei_me_irq_thread_handler);
 #define MEI_POLLING_TIMEOUT_ACTIVE 100
 #define MEI_POLLING_TIMEOUT_IDLE   500
 
+/**
+ * mei_me_polling_thread - interrupt register polling thread
+ *
+ * The thread monitors the interrupt source register and calls
+ * mei_me_irq_thread_handler() to handle the firmware
+ * input.
+ *
+ * The function polls in MEI_POLLING_TIMEOUT_ACTIVE timeout
+ * in case there was an event, in idle case the polling
+ * time increases yet again by MEI_POLLING_TIMEOUT_ACTIVE
+ * up to MEI_POLLING_TIMEOUT_IDLE.
+ *
+ * @_dev: mei device
+ *
+ * Return: always 0
+ */
 int mei_me_polling_thread(void *_dev)
 {
 	struct mei_device *dev = _dev;
@@ -1540,6 +1635,10 @@ int mei_me_polling_thread(void *_dev)
 			if (irq_ret != IRQ_HANDLED)
 				dev_err(dev->dev, "irq_ret %d\n", irq_ret);
 		} else {
+			/*
+			 * Increase timeout by MEI_POLLING_TIMEOUT_ACTIVE
+			 * up to MEI_POLLING_TIMEOUT_IDLE
+			 */
 			polling_timeout = clamp_val(polling_timeout + MEI_POLLING_TIMEOUT_ACTIVE,
 						    MEI_POLLING_TIMEOUT_ACTIVE,
 						    MEI_POLLING_TIMEOUT_IDLE);
@@ -1581,7 +1680,10 @@ static const struct mei_hw_ops mei_me_hw_ops = {
 
 	.rdbuf_full_slots = mei_me_count_full_read_slots,
 	.read_hdr = mei_me_mecbrw_read,
-	.read = mei_me_read_slots
+	.read = mei_me_read_slots,
+
+	.forcewake_get = mei_gt_forcewake_get,
+	.forcewake_put = mei_gt_forcewake_put,
 };
 
 /**

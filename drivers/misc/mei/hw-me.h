@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
- * Copyright (c) 2012-2020, Intel Corporation. All rights reserved.
+ * Copyright (c) 2012-2022, Intel Corporation. All rights reserved.
  * Intel Management Engine Interface (Intel MEI) Linux driver
  */
 
@@ -51,6 +51,7 @@ struct mei_cfg {
  * @d0i3_supported: di03 support
  * @hbuf_depth: depth of hardware host/write buffer in slots
  * @read_fws: read FW status register handler
+ * @polling_thread: interrupt polling thread
  * @wait_active: the polling thread activity wait queue
  * @is_active: the device is active
  */
@@ -66,6 +67,11 @@ struct mei_me_hw {
 	struct task_struct *polling_thread;
 	wait_queue_head_t wait_active;
 	bool is_active;
+	/* forcewake wa */
+	void *gsc;
+	void (*forcewake_get)(void *gsc);
+	void (*forcewake_put)(void *gsc);
+
 };
 
 #define to_me_hw(dev) (struct mei_me_hw *)((dev)->hw)

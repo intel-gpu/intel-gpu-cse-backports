@@ -1,13 +1,13 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
- * Copyright (c) 2003-2021, Intel Corporation. All rights reserved.
+ * Copyright (c) 2003-2022, Intel Corporation. All rights reserved.
  * Intel Management Engine Interface (Intel MEI) Linux driver
  */
 
 #ifndef _MEI_MKHI_H_
 #define _MEI_MKHI_H_
 
-#include "mei_dev.h"
+#include <linux/types.h>
 
 #define MKHI_FEATURE_PTT 0x10
 
@@ -51,7 +51,7 @@ struct mkhi_msg {
 
 struct mkhi_gfx_mem_ready {
 	struct mkhi_msg_hdr hdr;
-	uint32_t flags;
+	u32    flags;
 } __packed;
 
 #endif /* _MEI_MKHI_H_ */
