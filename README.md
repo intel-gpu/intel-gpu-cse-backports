@@ -34,6 +34,9 @@ sudo apt install \
 ```
 
 #### Create debian package:
+
+NOTE: use OS_TYPE=ubuntu_20.04 for kernel 5.14, for kernel 5.15 or 5.17 use OS_TYPE=ubuntu_22.04.
+
 ```
 export OS_TYPE=ubuntu_20.04
 BUILD_VERSION=1 make -f Makefile.dkms dkmsdeb-pkg
