@@ -1,0 +1,80 @@
+#!/bin/sh
+#
+#	Output a RPM spec file to generate CSE binary package
+#
+
+if [ "$1"="" ]; then
+	PKG_NAME="$1"
+else
+	PKG_NAME="intel-platform-cse"
+fi
+
+if [ "$2"="" ]; then
+	PKG_VER="$2"
+else
+	PKG_VER="1.0"
+fi
+
+if [ "$3"="" ]; then
+	REL_NAME="$3"
+else
+	REL_NAME="1"
+fi
+
+sed -e '/^DEL/d' -e 's/^\t*//' <<EOF
+	%define module $PKG_NAME
+	%define version $PKG_VER
+	%define release $REL_NAME
+
+	%define _flavor %{?FLAVOR}%{?!FLAVOR:default}
+	%define _kobj %(realpath %{_usrsrc}/linux-obj/x86_64/%{_flavor}/)
+	%define _krel %(make -si -C %{_kobj} %linux_make_arch kernelrelease)
+
+	Summary: Backports CSE Module Binary Package
+	Name: %{module}
+	Version: %{version}
+	Release: %{release}
+	License: GPL
+	Group: System Environment/Base
+	BuildArch: x86_64
+	Vendor: Intel
+	Provides: %{module}
+	Packager: linux-graphics@intel.com
+	Requires: gcc bash sed
+	Source0: %{module}-%{version}-%{release}-src.tar.gz
+	BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root/
+
+	%kernel_module_package %{_flavor}
+
+	%description
+	Out of tree CSE driver modules for SLES15SP4
+
+	%prep
+	%setup -q -c
+	
+	%build
+	num_cpu_cores()
+	{
+	  if [ -x /usr/bin/nproc ]; then
+	    nproc
+	  else
+	    echo "1"
+	  fi
+	}
+	make -j\$(num_cpu_cores) KDIR=%{kernel_module_directory}/%{_krel}/build modules
+
+	%install
+	mkdir -p %{buildroot}/lib/modules/%{_krel}/%{kernel_module_package_moddir}/
+	find . -name "*.ko" -exec install -m 0500 {} %{buildroot}%{kernel_module_directory}/%{_krel}/%{kernel_module_package_moddir}/ \;
+
+	%clean
+	if [ "%{buildroot}" != "/" ]; then
+		rm -rf %{buildroot}
+	fi
+
+	%pre
+
+	%post
+
+	%preun
+EOF

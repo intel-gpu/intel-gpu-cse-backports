@@ -59,6 +59,8 @@ sudo zypper install \
 
 #### Build and install dkms package
 ```
+export OS_TYPE=sles
+export OS_VERSION=15sp3
 BUILD_VERSION=1 make -f Makefile.dkms dkmsrpm-pkg
 ```
 
@@ -111,4 +113,39 @@ To install, run:
 ```
 cp $HOME/rpmbuild/RPMS/x86_64/*.rpm .
 sudo dnf install intel-platform-cse-dkms*.rpm
+```
+
+## How to generate the binary package
+
+### SLES 15SP3
+
+#### Install dependencies:
+
+```
+sudo zypper install \
+   make \
+   linux-glibc-devel \
+   lsb-release \
+   rpm-build
+```
+
+#### Build and install dkms package
+```
+export OS_TYPE=sles
+export OS_VERSION=15sp3
+make -f Makefile.dkms BUILD_VERSION=1 binrpm-pkg
+```
+
+The rpm package will be placed in $HOME/rpmbuild/RPMS/x86_64/.
+For example:
+
+```
+/home/user/rpmbuild/RPMS/x86_64/intel-platform-cse-kmp-default-2022.42_k5.3.18_150300.59.93-1.x86_64.rpm
+```
+
+Install with:
+
+```
+cp $HOME/rpmbuild/RPMS/x86_64/*.rpm .
+sudo rpm -ivh intel-platform-cse*.rpm
 ```
