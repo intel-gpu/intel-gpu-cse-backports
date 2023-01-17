@@ -120,3 +120,38 @@ To install, run:
 cp $HOME/rpmbuild/RPMS/x86_64/*.rpm .
 sudo dnf install intel-platform-cse-dkms*.rpm
 ```
+
+## How to generate the binary package
+
+### SLES 15SP4
+
+#### Install dependencies:
+
+```
+sudo zypper install \
+   make \
+   linux-glibc-devel \
+   lsb-release \
+   rpm-build
+```
+
+#### Build and install binary package
+```
+export OS_TYPE=sles
+export OS_VERSION=15sp4
+make -f Makefile.dkms BUILD_VERSION=1 binrpm-pkg
+```
+
+The rpm package will be placed in $HOME/rpmbuild/RPMS/x86_64/.
+For example:
+
+```
+/home/user/rpmbuild/RPMS/x86_64/intel-platform-cse-kmp-default-2022.46.1_k5.14.21_150400.24.21-1.x86_64.rpm
+```
+
+To install, run:
+
+```
+cp $HOME/rpmbuild/RPMS/x86_64/intel-platform-cse*.rpm .
+sudo rpm -ivh intel-platform-cse*.rpm
+```

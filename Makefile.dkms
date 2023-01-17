@@ -33,11 +33,13 @@ export KLIB KLIB_BUILD BACKPORT_DIR KMODDIR KMODPATH_ARG
 #----------------------------------------------------------------------------
 TAR_CONTENT := Makefile* drivers scripts backport-include
 DKMSMKSPEC := $(BACKPORT_DIR)/scripts/backport-mkdkmsspec
+BINMKSPEC := $(BACKPORT_DIR)/scripts/backport-mkbinspec
 DKMSMKCONF := $(BACKPORT_DIR)/scripts/backport-mkdkmsconf
 MODULE_NAME ?= intel-platform-cse-dkms
+BIN_MODULE_NAME ?= intel-platform-cse
 ARCH := x86_64
 
-VERSION := 2022.46.1
+VERSION := 2022.52
 ifneq ($(BUILD_VERSION), )
 RELEASE := $(BUILD_VERSION)
 else
@@ -51,13 +53,20 @@ DEB_SRC_DIR := $(DEB_PACKAGE_NAME)/usr/src/$(MODULE_NAME)-$(VERSION)-$(RELEASE)
 backport-include/generated_osv_version.h:
 	scripts/generate_osv_version_h.sh > $@
 
-.PHONY: dkmsrpm-pkg dkmsdeb-pkg
+.PHONY: dkmsrpm-pkg dkmsdeb-pkg binrpm-pkg
 dkmsrpm-pkg: backport-include/generated_osv_version.h
 	$(CONFIG_SHELL) $(DKMSMKCONF) $(MODULE_NAME) $(VERSION) $(RELEASE) > $(BACKPORT_DIR)/dkms.conf
 	$(CONFIG_SHELL) $(DKMSMKSPEC) $(MODULE_NAME) $(VERSION) $(RELEASE) > $(BACKPORT_DIR)/$(MODULE_NAME).spec
 	tar -cz $(RCS_TAR_IGNORE) -f $(MODULE_NAME)-$(VERSION)-src.tar.gz \
 		$(TAR_CONTENT) $(MODULE_NAME).spec dkms.conf;
 	+rpmbuild $(RPMOPTS) --target $(ARCH) -ta $(MODULE_NAME)-$(VERSION)-src.tar.gz \
+	--define='_smp_mflags %{nil}'
+
+binrpm-pkg: backport-include/generated_osv_version.h
+	$(CONFIG_SHELL) $(BINMKSPEC) $(BIN_MODULE_NAME) $(VERSION) $(RELEASE) > $(BACKPORT_DIR)/$(BIN_MODULE_NAME).spec
+	tar -cz $(RCS_TAR_IGNORE) -f $(BIN_MODULE_NAME)-$(VERSION)-$(RELEASE)-src.tar.gz \
+		$(TAR_CONTENT) $(BIN_MODULE_NAME).spec;
+	+rpmbuild $(RPMOPTS) --target $(ARCH) -ta $(BIN_MODULE_NAME)-$(VERSION)-$(RELEASE)-src.tar.gz \
 	--define='_smp_mflags %{nil}'
 
 dkmsdeb-pkg: backport-include/generated_osv_version.h
