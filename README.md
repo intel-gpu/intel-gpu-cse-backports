@@ -6,6 +6,19 @@ The driver is provided as a DKMS module targeting distinct
 versions of various distros. Each backport is on a topic 
 branch. Current support status is documented on the topic branch.
 
+## Branching and tagging strategy
+
+We will no longer update branches and add tags for specific operating systems. At the moment, all supported operating systems can be built from the branches listed below and have corresponding tags with the branch name suffix:
+
+- main 
+   - SLES 15SP4 
+   - Ubuntu 20.04 (kernel 5.15)
+   - Ubuntu 22.04 (kernel 5.17) 
+   - RHEL 8.6
+
+- legacy
+   - SLES 15SP3
+
 ## Dependencies
 This driver is part of a collection of kernel mode drivers 
 that together enable support for Intel graphics. The backports 
