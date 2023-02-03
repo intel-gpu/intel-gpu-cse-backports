@@ -8,7 +8,9 @@ branch. Current support status is documented on the topic branch.
 
 ## Branching and tagging strategy
 
-We will no longer update branches and add tags for specific operating systems. At the moment, all supported operating systems can be built from the branches listed below and have corresponding tags with the branch name suffix:
+We will no longer update branches and add tags for specific operating systems. 
+At the moment, the driver can be built for all supported operating systems from the branches listed below. 
+For each branch there will be created corresponding release tag with the branch name suffix.
 
 - main 
    - SLES 15SP4 
