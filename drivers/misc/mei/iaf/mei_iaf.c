@@ -21,6 +21,7 @@
 #include <drm/i915_mei_iaf_interface.h>
 
 #include "mkhi.h"
+#include "version/module_version.h"
 
 #define MCA_ARBSVN_COMMIT_COMMAND_ID 0x1B
 
@@ -293,3 +294,4 @@ module_mei_cl_driver(mei_iaf_driver);
 MODULE_AUTHOR("Intel Corporation");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("MEI IAF");
+MODULE_VERSION(BACKPORT_MODULE_VER);

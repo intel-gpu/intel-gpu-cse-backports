@@ -32,7 +32,7 @@ elif [ "$OS_FAMILY" = "UBUNTU" ]; then
 		echo "5.14"
 		exit 0
 	elif [ "$OSV_VERSION" = "22" ]; then
-		echo "5.{15,17}"
+		echo "5.{15,17,19}"
 		exit 0
 	fi
 fi

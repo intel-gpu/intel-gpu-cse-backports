@@ -9,7 +9,13 @@
 #ifndef __MEI_HDCP_H__
 #define __MEI_HDCP_H__
 
+#include <linux/version.h>
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,19,0) 
+#include <drm/display/drm_hdcp.h>
+#else
 #include <drm/drm_hdcp.h>
+#endif
 
 /* me_hdcp_status: Enumeration of all HDCP Status Codes */
 enum me_hdcp_status {

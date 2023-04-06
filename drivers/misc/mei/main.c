@@ -27,6 +27,7 @@
 
 #include "mei_dev.h"
 #include "client.h"
+#include "version/module_version.h"
 
 static struct class *mei_class;
 static dev_t mei_devt;
@@ -1345,4 +1346,4 @@ module_exit(mei_exit);
 MODULE_AUTHOR("Intel Corporation");
 MODULE_DESCRIPTION("Intel(R) Management Engine Interface");
 MODULE_LICENSE("GPL v2");
-
+MODULE_VERSION(BACKPORT_MODULE_VER);

@@ -22,6 +22,7 @@
 #include "client.h"
 #include "hw-me-regs.h"
 #include "hw-me.h"
+#include "version/module_version.h"
 
 /* mei_pci_tbl - PCI Device ID Table */
 static const struct pci_device_id mei_me_pci_tbl[] = {
@@ -531,3 +532,4 @@ module_pci_driver(mei_me_driver);
 MODULE_AUTHOR("Intel Corporation");
 MODULE_DESCRIPTION("Intel(R) Management Engine Interface");
 MODULE_LICENSE("GPL v2");
+MODULE_VERSION(BACKPORT_MODULE_VER);
