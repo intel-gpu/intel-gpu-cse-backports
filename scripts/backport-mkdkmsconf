@@ -68,6 +68,6 @@ sed -e '/^DEL/d' -e 's/^\t*//' <<EOF
 	  fi
 	}
 
-	MAKE="'make' -j\$(num_cpu_cores) KDIR=/lib/modules/\$kernelver/build modules"
+	MAKE="'make' -j\$(num_cpu_cores) KDIR=/lib/modules/\$kernelver/build modules MODULE_VERSION=$PKG_VER-$REL_NAME"
 	CLEAN="'make' clean"
 EOF

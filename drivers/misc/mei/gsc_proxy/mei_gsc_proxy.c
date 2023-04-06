@@ -19,6 +19,8 @@
 #include <drm/i915_component.h>
 #include <drm/i915_gsc_proxy_mei_interface.h>
 
+#include "version/module_version.h"
+
 /**
  * mei_gsc_proxy_send() - Sends a proxy message to ME FW.
  * @dev: device corresponding to the mei_cl_device
@@ -219,3 +221,4 @@ module_mei_cl_driver(mei_gsc_proxy_driver);
 MODULE_AUTHOR("Intel Corporation");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("MEI GSC PROXY");
+MODULE_VERSION(BACKPORT_MODULE_VER);

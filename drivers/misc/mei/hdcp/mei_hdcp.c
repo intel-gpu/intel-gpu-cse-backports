@@ -26,6 +26,7 @@
 #include <drm/i915_mei_hdcp_interface.h>
 
 #include "mei_hdcp.h"
+#include "version/module_version.h"
 
 /**
  * mei_hdcp_initiate_session() - Initiate a Wired HDCP2.2 Tx Session in ME FW
@@ -881,3 +882,4 @@ module_mei_cl_driver(mei_hdcp_driver);
 MODULE_AUTHOR("Intel Corporation");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("MEI HDCP");
+MODULE_VERSION(BACKPORT_MODULE_VER);

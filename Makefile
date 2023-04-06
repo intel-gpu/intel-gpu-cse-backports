@@ -1,7 +1,12 @@
 ifneq ($(KERNELRELEASE),)
 NOSTDINC_FLAGS += \
         -I$(M)/backport-include/ \
-	-I$(M)/backport-include/uapi
+		-I$(M)/backport-include/uapi
+
+ccflags-y += -DDISTRO_NAME="$(shell cat /etc/os-release | grep PRETTY_NAME | sed 's/PRETTY_NAME="//;s/"//' | sed 's/ /-/g')" \
+			 -DKERNEL_VERSION_NAME="$(shell uname -r)" \
+			 -DCSE_BACKPORT_VERSION="$(MODULE_VERSION)"
+
 obj-m := mei.o
 mei-objs := drivers/misc/mei/init.o
 mei-objs += drivers/misc/mei/hbm.o

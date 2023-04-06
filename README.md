@@ -49,7 +49,6 @@ sudo apt install \
 ```
 
 #### Create debian package:
-
 NOTE: use OS_TYPE=ubuntu_20.04 for kernel 5.14, for kernel 5.15 or 5.17 use OS_TYPE=ubuntu_22.04.
 
 ```
@@ -79,7 +78,7 @@ sudo zypper install \
 #### Build and install dkms package
 ```
 export OS_TYPE=sles
-export OS_VERSION=15sp4
+export OS_VERSION=15sp3
 BUILD_VERSION=1 make -f Makefile.dkms dkmsrpm-pkg
 ```
 
@@ -138,7 +137,7 @@ sudo dnf install intel-platform-cse-dkms*.rpm
 
 ## How to generate the binary package
 
-### SLES 15SP4
+### SLES 15SP3
 
 #### Install dependencies:
 
@@ -150,10 +149,10 @@ sudo zypper install \
    rpm-build
 ```
 
-#### Build and install binary package
+#### Build and install dkms package
 ```
 export OS_TYPE=sles
-export OS_VERSION=15sp4
+export OS_VERSION=15sp3
 make -f Makefile.dkms BUILD_VERSION=1 binrpm-pkg
 ```
 
@@ -161,12 +160,12 @@ The rpm package will be placed in $HOME/rpmbuild/RPMS/x86_64/.
 For example:
 
 ```
-/home/user/rpmbuild/RPMS/x86_64/intel-platform-cse-kmp-default-2022.46.1_k5.14.21_150400.24.21-1.x86_64.rpm
+/home/user/rpmbuild/RPMS/x86_64/intel-platform-cse-kmp-default-2022.42_k5.3.18_150300.59.93-1.x86_64.rpm
 ```
 
-To install, run:
+Install with:
 
 ```
-cp $HOME/rpmbuild/RPMS/x86_64/intel-platform-cse*.rpm .
+cp $HOME/rpmbuild/RPMS/x86_64/*.rpm .
 sudo rpm -ivh intel-platform-cse*.rpm
 ```

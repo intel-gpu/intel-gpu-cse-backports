@@ -21,6 +21,7 @@
 #include <drm/i915_pxp_tee_interface.h>
 
 #include "mei_pxp.h"
+#include "version/module_version.h"
 
 /**
  * mei_pxp_send_message() - Sends a PXP message to ME FW.
@@ -261,3 +262,4 @@ module_mei_cl_driver(mei_pxp_driver);
 MODULE_AUTHOR("Intel Corporation");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("MEI PXP");
+MODULE_VERSION(BACKPORT_MODULE_VER);

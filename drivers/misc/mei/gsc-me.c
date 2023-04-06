@@ -21,6 +21,8 @@
 
 #include "mei-trace.h"
 
+#include "version/module_version.h"
+
 #define MEI_GSC_RPM_TIMEOUT 500
 
 static inline bool mei_gsc_hw_is_unavailable(const struct device *dev)
@@ -643,3 +645,4 @@ MODULE_AUTHOR("Intel Corporation");
 MODULE_ALIAS("platform:mei-gsc");
 MODULE_ALIAS("platform:mei-gscfi");
 MODULE_LICENSE("GPL v2");
+MODULE_VERSION(BACKPORT_MODULE_VER);

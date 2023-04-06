@@ -23,6 +23,7 @@
 
 #include "mei_dev.h"
 #include "hw-txe.h"
+#include "version/module_version.h"
 
 static const struct pci_device_id mei_txe_pci_tbl[] = {
 	{PCI_VDEVICE(INTEL, 0x0F18)}, /* Baytrail */
@@ -409,3 +410,4 @@ module_pci_driver(mei_txe_driver);
 MODULE_AUTHOR("Intel Corporation");
 MODULE_DESCRIPTION("Intel(R) Trusted Execution Environment Interface");
 MODULE_LICENSE("GPL v2");
+MODULE_VERSION(BACKPORT_MODULE_VER);

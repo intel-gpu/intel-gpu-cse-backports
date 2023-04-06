@@ -31,7 +31,7 @@ export KLIB KLIB_BUILD BACKPORT_DIR KMODDIR KMODPATH_ARG
 # Rpm generated can be copied to client machine and install
 # will trigger source build and install on modules
 #----------------------------------------------------------------------------
-TAR_CONTENT := Makefile* drivers scripts backport-include
+TAR_CONTENT := Makefile* drivers scripts backport-include VERSION
 DKMSMKSPEC := $(BACKPORT_DIR)/scripts/backport-mkdkmsspec
 BINMKSPEC := $(BACKPORT_DIR)/scripts/backport-mkbinspec
 DKMSMKCONF := $(BACKPORT_DIR)/scripts/backport-mkdkmsconf
@@ -39,7 +39,13 @@ MODULE_NAME ?= intel-platform-cse-dkms
 BIN_MODULE_NAME ?= intel-platform-cse
 ARCH := x86_64
 
-VERSION := 2022.52
+SOURCE_VERSION = $(shell cat $(BACKPORT_DIR)/VERSION)
+ifneq ($(SOURCE_VERSION), )
+VERSION := $(SOURCE_VERSION)
+else
+$(error "$$SOURCE_VERSION not set")
+endif
+
 ifneq ($(BUILD_VERSION), )
 RELEASE := $(BUILD_VERSION)
 else
