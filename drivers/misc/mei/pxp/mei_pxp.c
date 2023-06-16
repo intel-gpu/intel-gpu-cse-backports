@@ -80,7 +80,8 @@ mei_pxp_receive_message(struct device *dev, void *buffer, size_t size)
 
 /**
  * mei_pxp_gsc_command() - sends a gsc command, by sending
- * a gsl mei message to gsc and receiving reply from gsc
+ * a sgl mei message to gsc and receiving reply from gsc
+ *
  * @dev: device corresponding to the mei_cl_device
  * @client_id: client id to send the command to
  * @fence_id: fence id to send the command to
@@ -95,9 +96,6 @@ static ssize_t mei_pxp_gsc_command(struct device *dev, u8 client_id, u32 fence_i
 				   struct scatterlist *sg_out)
 {
 	struct mei_cl_device *cldev;
-
-	if (!dev || !sg_in || !sg_out)
-		return -EINVAL;
 
 	cldev = to_mei_cl_device(dev);
 
@@ -159,11 +157,11 @@ static int mei_pxp_component_match(struct device *dev, int subcomponent,
 {
 	struct device *base = data;
 
-	if (strcmp(dev->driver->name, "i915") ||
-	    subcomponent != I915_COMPONENT_PXP)
+	if (!dev)
 		return 0;
 
-	if (!dev)
+	if (!dev->driver || strcmp(dev->driver->name, "i915") ||
+	    subcomponent != I915_COMPONENT_PXP)
 		return 0;
 
 	base = base->parent;

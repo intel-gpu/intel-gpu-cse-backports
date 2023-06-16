@@ -31,11 +31,6 @@
 #define MEI_GT_FORCEWAKE_LINK_TIMEOUT 3 /* Timeout to wait for driver ready after GT Forcewake */
 
 /*
- * FW page size for DMA allocations
- */
-#define MEI_FW_PAGE_SIZE 4096UL
-
-/*
  * MEI Version
  */
 #define HBM_MINOR_VERSION                   2
@@ -330,6 +325,18 @@ struct mei_gsc_sgl {
 #define GSC_ADDRESS_TYPE_PHYSICAL_CONTINUOUS 2 /* max of 64K */
 #define GSC_ADDRESS_TYPE_PHYSICAL_SGL 3
 
+/**
+ * struct mei_ext_hdr_gsc_h2f - extended header: gsc host to firmware interface
+ *
+ * @hdr: extended header
+ * @client_id: GSC_HECI_MSG_KERNEL or GSC_HECI_MSG_USER
+ * @addr_type: GSC_ADDRESS_TYPE_{GTT, PPGTT, PHYSICAL_CONTINUOUS, PHYSICAL_SGL}
+ * @fence_id: synchronization marker
+ * @input_address_count: number of input sgl buffers
+ * @output_address_count: number of output sgl buffers
+ * @reserved: reserved
+ * @sgl: sg list
+ */
 struct mei_ext_hdr_gsc_h2f {
 	struct mei_ext_hdr hdr;
 	u8                 client_id;
@@ -341,6 +348,15 @@ struct mei_ext_hdr_gsc_h2f {
 	struct mei_gsc_sgl sgl[];
 } __packed;
 
+/**
+ * struct mei_ext_hdr_gsc_f2h - gsc firmware to host interface
+ *
+ * @hdr: extended header
+ * @client_id: GSC_HECI_MSG_KERNEL or GSC_HECI_MSG_USER
+ * @reserved: reserved
+ * @fence_id: synchronization marker
+ * @written: number of bytes written to firmware
+ */
 struct mei_ext_hdr_gsc_f2h {
 	struct mei_ext_hdr hdr;
 	u8                 client_id;
@@ -371,9 +387,12 @@ static inline struct mei_ext_hdr *mei_ext_next(struct mei_ext_hdr *ext)
  *
  * Return: extend header length in bytes
  */
-static inline u32 mei_ext_hdr_len(struct mei_ext_hdr *ext)
+static inline u32 mei_ext_hdr_len(const struct mei_ext_hdr *ext)
 {
-	return  (ext) ? ext->length * sizeof(u32) : 0;
+	if (!ext)
+		return 0;
+
+	return ext->length * sizeof(u32);
 }
 
 /**

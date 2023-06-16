@@ -12,6 +12,7 @@
 
 struct mei_cl_device;
 struct mei_device;
+struct scatterlist;
 
 typedef void (*mei_cldev_cb_t)(struct mei_cl_device *cldev);
 

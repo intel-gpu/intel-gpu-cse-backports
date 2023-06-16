@@ -9,7 +9,7 @@
 #ifdef OS_FAMILY_SUSE
 #	define SUSE_RELEASE_CODE OSV_RELEASE_CODE
 #	define SUSE_RELEASE_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))
-#	define SUSE_RELEASE_VERSION_GEQ(a,b,c) SUSE_RELEASE_CODE >= SUSE_RELEASE_VERSION(a,b,c)
+#	define SUSE_RELEASE_VERSION_GEQ(a,b,c) ((SUSE_RELEASE_CODE) >= (SUSE_RELEASE_VERSION(a,b,c)))
 #else
 #	define SUSE_RELEASE_CODE 0
 #	define SUSE_RELEASE_VERSION(a,b,c) 0
@@ -19,9 +19,11 @@
 #ifdef OS_FAMILY_REDHAT
 #	define REDHAT_RELEASE_CODE OSV_RELEASE_CODE
 #	define REDHAT_RELEASE_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))
+#   define REDHAT_RELEASE_VERSION_GEQ(a,b,c) ((REDHAT_RELEASE_CODE) >= (REDHAT_RELEASE_VERSION(a,b,c)))
 #else
 #	define REDHAT_RELEASE_CODE 0
 #	define REDHAT_RELEASE_VERSION(a,b,c) 0
+#   define REDHAT_RELEASE_VERSION_GEQ(a,b,c) 0
 #endif
 
 #ifdef OS_FAMILY_UBUNTU

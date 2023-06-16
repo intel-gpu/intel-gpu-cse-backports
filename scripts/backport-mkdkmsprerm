@@ -1,0 +1,30 @@
+#!/bin/sh
+#
+#	Output a RPM spec file to generate CSE dkms source
+#
+
+if [ "$1"="" ]; then
+	MODULE="$1"
+else
+	MODULE="intel-platform-cse-dkms"
+fi
+
+if [ "$2"="" ]; then
+	VERSION="$2"
+else
+	VERSION="1.0"
+fi
+
+if [ "$3"="" ]; then
+	RELEASE="$3"
+else
+	RELEASE="1"
+fi
+
+cat <<EOF
+echo -e
+echo -e "Uninstall of ${MODULE} module (version ${VERSION}-${RELEASE}) beginning:"
+/usr/sbin/dkms uninstall --force -m ${MODULE} -v ${VERSION}-${RELEASE}
+/usr/sbin/dkms remove -m ${MODULE} -v ${VERSION}-${RELEASE} --all --rpm_safe_upgrade
+echo -e "Uninstall done."
+EOF

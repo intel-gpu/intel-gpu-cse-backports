@@ -128,7 +128,7 @@ static int mei_osver(struct mei_cl_device *cldev)
 	os_ver = (struct mei_os_ver *)fwcaps->data;
 	os_ver->os_type = OSTYPE_LINUX;
 
-	return __mei_cl_send(cldev->cl, buf, size, 0, mode, 0);
+	return __mei_cl_send(cldev->cl, buf, size, 0, mode);
 }
 
 #define MKHI_FWVER_BUF_LEN (sizeof(struct mkhi_msg_hdr) + \
@@ -149,7 +149,7 @@ static int mei_fwver(struct mei_cl_device *cldev)
 	req.hdr.command = MKHI_GEN_GET_FW_VERSION_CMD;
 
 	ret = __mei_cl_send(cldev->cl, (u8 *)&req, sizeof(req), 0,
-			    MEI_CL_IO_TX_BLOCKING, 0);
+			    MEI_CL_IO_TX_BLOCKING);
 	if (ret < 0) {
 		dev_info(&cldev->dev, "Could not send ReqFWVersion cmd ret = %d\n", ret);
 		return ret;
@@ -188,7 +188,7 @@ static int mei_fwver(struct mei_cl_device *cldev)
 	return ret;
 }
 
-#define GFX_MEMORY_READY_TIMEOUT 200
+#define GFX_MEMORY_READY_TIMEOUT 200 /* timeout in milliseconds */
 
 static int mei_gfx_memory_ready(struct mei_cl_device *cldev)
 {
@@ -200,7 +200,8 @@ static int mei_gfx_memory_ready(struct mei_cl_device *cldev)
 	req.flags = MKHI_GFX_MEM_READY_PXP_ALLOWED;
 
 	dev_dbg(&cldev->dev, "Sending memory ready command\n");
-	return __mei_cl_send(cldev->cl, (u8 *)&req, sizeof(req), 0, mode, GFX_MEMORY_READY_TIMEOUT);
+	return __mei_cl_send_timeout(cldev->cl, (u8 *)&req, sizeof(req), 0,
+				     mode, GFX_MEMORY_READY_TIMEOUT);
 }
 
 static void mei_mkhi_fix(struct mei_cl_device *cldev)
@@ -377,9 +378,9 @@ static int mei_nfc_if_version(struct mei_cl *cl,
 	WARN_ON(mutex_is_locked(&bus->device_lock));
 
 	ret = __mei_cl_send(cl, (u8 *)&cmd, sizeof(cmd), 0,
-			    MEI_CL_IO_TX_BLOCKING, 0);
+			    MEI_CL_IO_TX_BLOCKING);
 	if (ret < 0) {
-		dev_err(bus->dev, "Could not send IF version cmd\n");
+		dev_err(bus->dev, "Could not send IF version cmd ret = %d\n", ret);
 		return ret;
 	}
 
@@ -394,7 +395,7 @@ static int mei_nfc_if_version(struct mei_cl *cl,
 	bytes_recv = __mei_cl_recv(cl, (u8 *)reply, if_version_length, &vtag,
 				   0, 0);
 	if (bytes_recv < 0 || (size_t)bytes_recv < if_version_length) {
-		dev_err(bus->dev, "Could not read IF version\n");
+		dev_err(bus->dev, "Could not read IF version ret = %d\n", bytes_recv);
 		ret = -EIO;
 		goto err;
 	}
@@ -562,7 +563,7 @@ static struct mei_fixup {
 };
 
 /**
- * mei_cldev_fixup - run fixup handlers
+ * mei_cl_bus_dev_fixup - run fixup handlers
  *
  * @cldev: me client device
  */

@@ -15,6 +15,7 @@
 #include <linux/slab.h>
 #include <linux/mutex.h>
 #include <linux/interrupt.h>
+#include <linux/scatterlist.h>
 #include <linux/mei_cl_bus.h>
 
 #include "mei_dev.h"
@@ -30,12 +31,31 @@
  * @length: buffer length
  * @vtag: virtual tag
  * @mode: sending mode
- * @timeout: send timeout for blocking writes, 0 for infinite timeout
  *
  * Return: written size bytes or < 0 on error
  */
 ssize_t __mei_cl_send(struct mei_cl *cl, const u8 *buf, size_t length, u8 vtag,
-		      unsigned int mode, unsigned long timeout)
+		      unsigned int mode)
+{
+	return __mei_cl_send_timeout(cl, buf, length, vtag, mode, MAX_SCHEDULE_TIMEOUT);
+}
+
+/**
+ * __mei_cl_send_timeout - internal client send (write)
+ *
+ * @cl: host client
+ * @buf: buffer to send
+ * @length: buffer length
+ * @vtag: virtual tag
+ * @mode: sending mode
+ * @timeout: send timeout in milliseconds.
+ *           effective only for blocking writes: the MEI_CL_IO_TX_BLOCKING mode bit is set.
+ *           set timeout to the MAX_SCHEDULE_TIMEOUT to maixum allowed wait.
+ *
+ * Return: written size bytes or < 0 on error
+ */
+ssize_t __mei_cl_send_timeout(struct mei_cl *cl, const u8 *buf, size_t length, u8 vtag,
+			      unsigned int mode, unsigned long timeout)
 {
 	struct mei_device *bus;
 	struct mei_cl_cb *cb;
@@ -256,7 +276,7 @@ ssize_t mei_cldev_send_vtag(struct mei_cl_device *cldev, const u8 *buf,
 {
 	struct mei_cl *cl = cldev->cl;
 
-	return __mei_cl_send(cl, buf, length, vtag, MEI_CL_IO_TX_BLOCKING, 0);
+	return __mei_cl_send(cl, buf, length, vtag, MEI_CL_IO_TX_BLOCKING);
 }
 EXPORT_SYMBOL_GPL(mei_cldev_send_vtag);
 
@@ -662,52 +682,6 @@ static void mei_cl_bus_vtag_free(struct mei_cl_device *cldev)
 	kfree(cl_vtag);
 }
 
-void *mei_cldev_dma_map(struct mei_cl_device *cldev, u8 buffer_id, size_t size)
-{
-	struct mei_device *bus;
-	struct mei_cl *cl;
-	int ret;
-
-	if (!cldev || !buffer_id || !size)
-		return ERR_PTR(-EINVAL);
-
-	if (!IS_ALIGNED(size, MEI_FW_PAGE_SIZE)) {
-		dev_err(&cldev->dev, "Map size should be aligned to %lu\n",
-			MEI_FW_PAGE_SIZE);
-		return ERR_PTR(-EINVAL);
-	}
-
-	cl = cldev->cl;
-	bus = cldev->bus;
-
-	mutex_lock(&bus->device_lock);
-	ret = mei_cl_dma_alloc_and_map(cl, NULL, buffer_id, size);
-	mutex_unlock(&bus->device_lock);
-	if (ret)
-		return ERR_PTR(ret);
-	return cl->dma.vaddr;
-}
-EXPORT_SYMBOL_GPL(mei_cldev_dma_map);
-
-int mei_cldev_dma_unmap(struct mei_cl_device *cldev)
-{
-	struct mei_device *bus;
-	struct mei_cl *cl;
-	int ret;
-
-	if (!cldev)
-		return -EINVAL;
-
-	cl = cldev->cl;
-	bus = cldev->bus;
-
-	mutex_lock(&bus->device_lock);
-	ret = mei_cl_dma_unmap(cl, NULL);
-	mutex_unlock(&bus->device_lock);
-	return ret;
-}
-EXPORT_SYMBOL_GPL(mei_cldev_dma_unmap);
-
 /**
  * mei_cldev_enable - enable me client device
  *     create connection with me client
@@ -915,7 +889,7 @@ ssize_t mei_cldev_send_gsc_command(struct mei_cl_device *cldev,
 	}
 
 	/* send the message to GSC */
-	ret = __mei_cl_send(cl, (u8 *)ext_hdr, buf_sz, 0, MEI_CL_IO_SGL, 0);
+	ret = __mei_cl_send(cl, (u8 *)ext_hdr, buf_sz, 0, MEI_CL_IO_SGL);
 	if (ret < 0) {
 		dev_err(bus->dev, "__mei_cl_send failed, returned %zd\n", ret);
 		goto end;
@@ -1320,7 +1294,7 @@ static struct mei_cl_device *mei_cl_bus_dev_alloc(struct mei_device *bus,
 }
 
 /**
- * mei_cl_dev_setup - setup me client device
+ * mei_cl_bus_dev_setup - setup me client device
  *    run fix up routines and set the device name
  *
  * @bus: mei device
@@ -1369,6 +1343,7 @@ static int mei_cl_bus_dev_add(struct mei_cl_device *cldev)
  */
 static void mei_cl_bus_dev_stop(struct mei_cl_device *cldev)
 {
+	cldev->do_match = 0;
 	if (cldev->is_added)
 		device_release_driver(&cldev->dev);
 }

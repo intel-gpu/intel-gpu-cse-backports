@@ -2015,7 +2015,9 @@ err:
  *
  * @cl: host client
  * @cb: write callback with filled data
- * @timeout: send timeout for blocking writes, 0 for infinite timeout
+ * @timeout: send timeout in milliseconds.
+ *           effective only for blocking writes: the cb->blocking is set.
+ *           set timeout to the MAX_SCHEDULE_TIMEOUT to maixum allowed wait.
  *
  * Return: number of bytes sent on success, <0 on failure.
  */
@@ -2143,23 +2145,20 @@ out:
 	if (blocking && cl->writing_state != MEI_WRITE_COMPLETE) {
 
 		mutex_unlock(&dev->device_lock);
-		if (timeout) {
-			rets = wait_event_interruptible_timeout(cl->tx_wait,
-					cl->writing_state == MEI_WRITE_COMPLETE ||
-					(!mei_cl_is_connected(cl)),
-					msecs_to_jiffies(timeout));
-			if (rets == 0)
-				rets = -ETIME;
-			if (rets > 0)
-				rets = 0;
-		} else {
-			rets = wait_event_interruptible(cl->tx_wait,
-					cl->writing_state == MEI_WRITE_COMPLETE ||
-					(!mei_cl_is_connected(cl)));
-		}
-
+		rets = wait_event_interruptible_timeout(cl->tx_wait,
+							cl->writing_state == MEI_WRITE_COMPLETE ||
+							(!mei_cl_is_connected(cl)),
+							msecs_to_jiffies(timeout));
 		mutex_lock(&dev->device_lock);
+		/* clean all queue on timeout as something fatal happened */
+		if (rets == 0) {
+			rets = -ETIME;
+			mei_io_tx_list_free_cl(&dev->write_list, cl, NULL);
+			mei_io_tx_list_free_cl(&dev->write_waiting_list, cl, NULL);
+		}
 		/* wait_event_interruptible returns -ERESTARTSYS */
+		if (rets > 0)
+			rets = 0;
 		if (rets) {
 			if (signal_pending(current))
 				rets = -EINTR;

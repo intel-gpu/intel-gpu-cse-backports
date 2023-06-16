@@ -1,0 +1,38 @@
+#!/bin/sh
+
+if [ "$1"="" ]; then
+	MODULE="$1"
+else
+	MODULE="intel-platform-cse-dkms"
+fi
+
+if [ "$2"="" ]; then
+	VERSION="$2"
+else
+	VERSION="1.0"
+fi
+
+if [ "$3"="" ]; then
+	RELEASE="$3"
+else
+	RELEASE="1"
+fi
+
+# KERNEL_PATTERN var fetched from generate_kernel_pattern.sh in in following
+# format e.g.: 5.{15,17,19}
+# In order to be used by "grep -E" later it should be changed into format:
+# 5\.(15|17|19) 
+KERNEL_PATTERN=$(sh scripts/generate_kernel_pattern.sh | sed -e 's/\./\\./g' -e 's/{/(/g' -e 's/,/\|/g' -e 's/}/)/g')
+
+cat <<EOF
+/usr/sbin/dkms add -m ${MODULE} -v ${VERSION}-${RELEASE}
+for i in \$(ls -d /lib/modules/* | grep -E "${KERNEL_PATTERN}+"); do
+	H="\$i/build";
+	K=\$(echo \$i | cut -d '/' -f 4);
+	if [ -d \$H ]; then
+		/usr/sbin/dkms install --force -m ${MODULE} -v ${VERSION}-${RELEASE} -k \$K;
+	else
+		echo "SKIP DKMS Installation: kernel Headers not available for variant \$K";
+	fi
+done
+EOF

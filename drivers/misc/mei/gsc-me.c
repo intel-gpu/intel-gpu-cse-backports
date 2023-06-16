@@ -388,6 +388,8 @@ static int mei_gsc_forcewake_get_and_wait(struct mei_device *dev, bool need_runt
 
 	if (!(fw_status.status[0] & PCI_CFG_HFS_1_INITSTATE)) {
 		dev_err(dev->dev, "forcewake: FW not back from reset: %d\n", fw_status.status[0]);
+		dev->gt_forcewake_init_on = false;
+		dev->ops->forcewake_put(dev);
 		return -ENODEV;
 	}
 
@@ -404,6 +406,23 @@ runtime_pm:
 }
 
 #if IS_ENABLED(CONFIG_AUXILIARY_BUS)
+
+static void mei_gsc_forcewake_put(struct mei_device *dev, bool need_runtime_pm)
+{
+	mutex_lock(&dev->device_lock);
+
+	if (dev->forcewake_needed && dev->gt_forcewake_init_on) {
+		dev->ops->forcewake_put(dev);
+		dev->gt_forcewake_init_on = false;
+
+		if (need_runtime_pm) {
+			dev->ops->forcewake_put(dev);
+			pm_runtime_put_noidle(dev->dev);
+		}
+	}
+
+	mutex_unlock(&dev->device_lock);
+}
 
 static int mei_gsc_probe(struct auxiliary_device *aux_dev,
 			 const struct auxiliary_device_id *aux_dev_id)
@@ -466,7 +485,7 @@ static int mei_gsc_probe(struct auxiliary_device *aux_dev,
 		if (IS_ERR(hw->polling_thread)) {
 			ret = PTR_ERR(hw->polling_thread);
 			dev_err(device, "unable to create kernel thread: %d\n", ret);
-			goto err;
+			goto irq_err;
 		}
 	} else {
 		ret = devm_request_threaded_irq(device, hw->irq,
@@ -475,7 +494,7 @@ static int mei_gsc_probe(struct auxiliary_device *aux_dev,
 						IRQF_ONESHOT, KBUILD_MODNAME, dev);
 		if (ret) {
 			dev_err(device, "irq register failed %d\n", ret);
-			goto err;
+			goto irq_err;
 		}
 	}
 
@@ -506,6 +525,8 @@ register_err:
 	if (!mei_me_hw_use_polling(hw))
 		devm_free_irq(device, hw->irq, dev);
 
+irq_err:
+	mei_gsc_forcewake_put(dev, true);
 err:
 	dev_err(device, "probe failed: %d\n", ret);
 	dev_set_drvdata(device, NULL);
@@ -520,6 +541,8 @@ static void mei_gsc_remove(struct auxiliary_device *aux_dev)
 	dev = dev_get_drvdata(&aux_dev->dev);
 	if (!dev)
 		return;
+
+	hw = to_me_hw(dev);
 
 	if (mei_gsc_hw_is_unavailable(&aux_dev->dev))
 		dev->ops = &mei_gsc_hw_ops_null;
@@ -726,8 +749,10 @@ static int __maybe_unused mei_gsc_pm_resume(struct device *device)
 	}
 
 	ret = mei_restart(dev);
-	if (ret)
+	if (ret) {
+		mei_gsc_forcewake_put(dev, false);
 		return ret;
+	}
 
 	/* Start timer if stopped in suspend */
 	schedule_delayed_work(&dev->timer_work, HZ);

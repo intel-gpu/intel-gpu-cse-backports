@@ -1,0 +1,32 @@
+#!/bin/sh
+#
+#	Output a RPM spec file to generate CSE dkms source
+#
+
+if [ "$1"="" ]; then
+	MODULE="$1"
+else
+	MODULE="intel-platform-cse-dkms"
+fi
+
+if [ "$2"="" ]; then
+	VERSION="$2"
+else
+	VERSION="1.0"
+fi
+
+if [ "$3"="" ]; then
+	RELEASE="$3"
+else
+	RELEASE="1"
+fi
+
+cat <<EOF
+Package: ${MODULE}
+Version: ${VERSION}-${RELEASE}
+Architecture: `dpkg --print-architecture`
+Section: kernel
+Maintainer: Intel
+Description: CSE driver
+Replaces: CSE
+EOF

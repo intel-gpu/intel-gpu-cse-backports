@@ -35,6 +35,9 @@ TAR_CONTENT := Makefile* drivers scripts backport-include VERSION
 DKMSMKSPEC := $(BACKPORT_DIR)/scripts/backport-mkdkmsspec
 BINMKSPEC := $(BACKPORT_DIR)/scripts/backport-mkbinspec
 DKMSMKCONF := $(BACKPORT_DIR)/scripts/backport-mkdkmsconf
+DKMSPOSTINST := $(BACKPORT_DIR)/scripts/backport-mkdkmspostinst
+DKMSPRERM := $(BACKPORT_DIR)/scripts/backport-mkdkmsprerm
+DKMSCONTROL := $(BACKPORT_DIR)/scripts/backport-mkdkmscontrol
 MODULE_NAME ?= intel-platform-cse-dkms
 BIN_MODULE_NAME ?= intel-platform-cse
 ARCH := x86_64
@@ -63,9 +66,9 @@ backport-include/generated_osv_version.h:
 dkmsrpm-pkg: backport-include/generated_osv_version.h
 	$(CONFIG_SHELL) $(DKMSMKCONF) $(MODULE_NAME) $(VERSION) $(RELEASE) > $(BACKPORT_DIR)/dkms.conf
 	$(CONFIG_SHELL) $(DKMSMKSPEC) $(MODULE_NAME) $(VERSION) $(RELEASE) > $(BACKPORT_DIR)/$(MODULE_NAME).spec
-	tar -cz $(RCS_TAR_IGNORE) -f $(MODULE_NAME)-$(VERSION)-src.tar.gz \
+	tar -cz $(RCS_TAR_IGNORE) -f $(MODULE_NAME)-$(VERSION)-$(RELEASE)-src.tar.gz \
 		$(TAR_CONTENT) $(MODULE_NAME).spec dkms.conf;
-	+rpmbuild $(RPMOPTS) --target $(ARCH) -ta $(MODULE_NAME)-$(VERSION)-src.tar.gz \
+	+rpmbuild $(RPMOPTS) --target $(ARCH) -ta $(MODULE_NAME)-$(VERSION)-$(RELEASE)-src.tar.gz \
 	--define='_smp_mflags %{nil}'
 
 binrpm-pkg: backport-include/generated_osv_version.h
@@ -77,13 +80,12 @@ binrpm-pkg: backport-include/generated_osv_version.h
 
 dkmsdeb-pkg: backport-include/generated_osv_version.h
 	mkdir -p $(DEB_ROOT_DIR)
-	echo -e "Package: $(MODULE_NAME)\nVersion: $(VERSION)-$(RELEASE)\nArchitecture: `dpkg --print-architecture`\nSection: kernel\nMaintainer: Intel\nDescription: CSE driver\nReplaces: CSE" > $(DEB_ROOT_DIR)/control
-	echo -e "dkms add -m $(MODULE_NAME) -v $(VERSION)-$(RELEASE)\ndkms autoinstall" > $(DEB_ROOT_DIR)/postinst
-	echo -e "dkms remove -m $(MODULE_NAME)/$(VERSION)-$(RELEASE) --all" > $(DEB_ROOT_DIR)/prerm
+	$(CONFIG_SHELL) $(DKMSCONTROL) $(MODULE_NAME) $(VERSION) $(RELEASE) > $(DEB_ROOT_DIR)/control
+	$(CONFIG_SHELL) $(DKMSPOSTINST) $(MODULE_NAME) $(VERSION) $(RELEASE) > $(DEB_ROOT_DIR)/postinst
+	$(CONFIG_SHELL) $(DKMSPRERM) $(MODULE_NAME) $(VERSION) $(RELEASE) > $(DEB_ROOT_DIR)/prerm
 	chmod 775 $(DEB_ROOT_DIR)/{postinst,prerm}
 	mkdir -p $(DEB_SRC_DIR)
 	$(CONFIG_SHELL) $(DKMSMKCONF) $(MODULE_NAME) $(VERSION) $(RELEASE) > $(DEB_SRC_DIR)/dkms.conf
-	$(CONFIG_SHELL) $(DKMSMKSPEC) $(MODULE_NAME) $(VERSION) $(RELEASE) > $(DEB_SRC_DIR)/$(MODULE_NAME).spec
 	cp -r $(TAR_CONTENT) $(DEB_SRC_DIR)
 
 	+dpkg-deb --root-owner-group --build $(DEB_PACKAGE_NAME)

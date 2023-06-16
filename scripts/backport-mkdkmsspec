@@ -41,7 +41,7 @@ sed -e '/^DEL/d' -e 's/^\t*//' <<EOF
 	Requires: dkms gcc bash sed
 	# There is no Source# line for dkms.conf since it has been placed
 	# into the source tarball of SOURCE0
-	Source0: %{module}-%{version}-src.tar.gz
+	Source0: %{module}-%{version}-%{release}-src.tar.gz
 	BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root/
 
 	%description
@@ -49,18 +49,18 @@ sed -e '/^DEL/d' -e 's/^\t*//' <<EOF
 	.ko files
 
 	%prep
-	rm -rf %{module}-%{version}
-	mkdir %{module}-%{version}
-	cd %{module}-%{version}
-	tar xvzf \$RPM_SOURCE_DIR/%{module}-%{version}-src.tar.gz
+	rm -rf %{module}-%{version}-%{release}
+	mkdir %{module}-%{version}-%{release}
+	cd %{module}-%{version}-%{release}
+	tar xvzf \$RPM_SOURCE_DIR/%{module}-%{version}-%{release}-src.tar.gz
 	./scripts/generate_osv_version_h.sh > backport-include/generated_osv_version.h
 
 	%install
 	if [ "%{buildroot}" != "/" ]; then
 		rm -rf %{buildroot}
 	fi
-	mkdir -p %{buildroot}/usr/src/%{module}-%{version}/
-	cp -rf %{module}-%{version}/* %{buildroot}/usr/src/%{module}-%{version}
+	mkdir -p %{buildroot}/usr/src/%{module}-%{version}-%{release}/
+	cp -rf %{module}-%{version}-%{release}/* %{buildroot}/usr/src/%{module}-%{version}-%{release}
 
 	%clean
 	if [ "%{buildroot}" != "/" ]; then
@@ -69,22 +69,21 @@ sed -e '/^DEL/d' -e 's/^\t*//' <<EOF
 
 	%files
 	%defattr (-, root, root)
-	/usr/src/%{module}-%{version}/
+	/usr/src/%{module}-%{version}-%{release}/
 
 	%pre
 
 	%post
-	/usr/sbin/dkms add -m %module -v %version --rpm_safe_upgrade
+	/usr/sbin/dkms add -m %module -v %{version}-%{release} --rpm_safe_upgrade
 	for i in /lib/modules/$KERNEL_PATTERN*; do
 		H="\$i/build";
 		K=\$(echo \$i | cut -d '/' -f 4);
 		if [ -d \$H ]; then
-			/usr/sbin/dkms install --force -m %module -v %version -k \$K;
+			/usr/sbin/dkms install --force -m %module -v %{version}-%{release} -k \$K;
 		else
 			echo "SKIP DKMS Installation: kernel Headers not available for variant \$K";
 		fi
 	done
-	cp %{buildroot}/usr/src/%{module}-%{version}/dkms.conf /var/lib/dkms/%{module}/%{version}/source/dkms.conf
 	exit 0
 
 	%preun

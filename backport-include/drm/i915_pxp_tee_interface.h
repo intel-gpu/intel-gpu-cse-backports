@@ -11,7 +11,7 @@
 
 #include <linux/mutex.h>
 #include <linux/device.h>
-#include <linux/scatterlist.h>
+struct scatterlist;
 
 /**
  * struct i915_pxp_component_ops - ops for PXP services.

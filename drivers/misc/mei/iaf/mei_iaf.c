@@ -59,7 +59,7 @@ static int get_error_code(const struct device *dev, u8 result)
 		ret = 0;
 		break;
 	case MCA_ARB_SVN_DISABLED:
-		dev_err(dev, "Arb Svn disabled (error code 0x%x)\n",
+		dev_dbg(dev, "Arb Svn disabled (error code 0x%x)\n",
 			MCA_ARB_SVN_DISABLED);
 		ret = -ENOENT;
 	break;
@@ -69,12 +69,12 @@ static int get_error_code(const struct device *dev, u8 result)
 		ret = -EINVAL;
 	break;
 	case MCA_ARB_SVN_SAME:
-		dev_err(dev, "SVN was not updated, same value(error code 0x%x)\n",
+		dev_dbg(dev, "SVN was not updated, same value(error code 0x%x)\n",
 			MCA_ARB_SVN_SAME);
 		ret = -EACCES;
 	break;
 	case MCA_ARB_SVN_SMALLER:
-		dev_err(dev, "SVN was not updated, older value(error code 0x%x)\n",
+		dev_dbg(dev, "SVN was not updated, older value(error code 0x%x)\n",
 			MCA_ARB_SVN_SMALLER);
 		ret = -EBADF;
 	break;
@@ -222,11 +222,8 @@ static int mei_iaf_component_match(struct device *dev, int subcomponent,
 {
 	struct device *base = data;
 
-	dev_dbg(dev, "trying to match %s\n", dev->driver->name);
-	if (subcomponent != I915_COMPONENT_IAF)
-		return 0;
-
-	if (strcmp(dev->driver->name, "iaf"))
+	if (subcomponent != I915_COMPONENT_IAF ||
+	    !dev->driver || strcmp(dev->driver->name, "iaf"))
 		return 0;
 
 	base = base->parent;
@@ -273,8 +270,8 @@ static void mei_iaf_remove(struct mei_cl_device *cldev)
 }
 
 /* fe2af7a6-ef22-4b45-872f-176b0bbc8b43: MCHIF GUID */
-#define MEI_GUID_MCHIF GUID_INIT(0xfe2af7a6, 0xef22, 0x4b45, \
-				 0x87, 0x2f, 0x17, 0x6b, 0x0b, 0xbc, 0x8b, 0x43)
+#define MEI_GUID_MCHIF UUID_LE(0xfe2af7a6, 0xef22, 0x4b45, \
+			       0x87, 0x2f, 0x17, 0x6b, 0x0b, 0xbc, 0x8b, 0x43)
 
 static struct mei_cl_device_id mei_iaf_tbl[] = {
 	{ .uuid = MEI_GUID_MCHIF, .version = MEI_CL_VERSION_ANY },

@@ -22,23 +22,20 @@
 #include "version/module_version.h"
 
 /**
- * mei_gsc_proxy_send() - Sends a proxy message to ME FW.
+ * mei_gsc_proxy_send - Sends a proxy message to ME FW.
  * @dev: device corresponding to the mei_cl_device
  * @buf: a message buffer to send
  * @size: size of the message
- * Return: 0 on Success, <0 on Failure
+ * Return: bytes sent on Success, <0 on Failure
  */
 static int mei_gsc_proxy_send(struct device *dev, const void *buf, size_t size)
 {
-	struct mei_cl_device *cldev;
 	ssize_t ret;
 
 	if (!dev || !buf)
 		return -EINVAL;
 
-	cldev = to_mei_cl_device(dev);
-
-	ret = mei_cldev_send(cldev, buf, size);
+	ret = mei_cldev_send(to_mei_cl_device(dev), buf, size);
 	if (ret < 0)
 		dev_dbg(dev, "mei_cldev_send failed. %zd\n", ret);
 
@@ -46,23 +43,20 @@ static int mei_gsc_proxy_send(struct device *dev, const void *buf, size_t size)
 }
 
 /**
- * mei_gsc_proxy_recv() - Receives a proxy message from ME FW.
+ * mei_gsc_proxy_recv - Receives a proxy message from ME FW.
  * @dev: device corresponding to the mei_cl_device
  * @buf: a message buffer to contain the received message
  * @size: size of the buffer
- * Return: bytes sent on Success, <0 on Failure
+ * Return: bytes received on Success, <0 on Failure
  */
 static int mei_gsc_proxy_recv(struct device *dev, void *buf, size_t size)
 {
-	struct mei_cl_device *cldev;
 	ssize_t ret;
 
 	if (!dev || !buf)
 		return -EINVAL;
 
-	cldev = to_mei_cl_device(dev);
-
-	ret = mei_cldev_recv(cldev, buf, size);
+	ret = mei_cldev_recv(to_mei_cl_device(dev), buf, size);
 	if (ret < 0)
 		dev_dbg(dev, "mei_cldev_recv failed. %zd\n", ret);
 
@@ -79,15 +73,10 @@ static int mei_component_master_bind(struct device *dev)
 {
 	struct mei_cl_device *cldev = to_mei_cl_device(dev);
 	struct i915_gsc_proxy_component *comp_master = mei_cldev_get_drvdata(cldev);
-	int ret;
 
 	comp_master->ops = &mei_gsc_proxy_ops;
 	comp_master->mei_dev = dev;
-	ret = component_bind_all(dev, comp_master);
-	if (ret < 0)
-		return ret;
-
-	return 0;
+	return component_bind_all(dev, comp_master);
 }
 
 static void mei_component_master_unbind(struct device *dev)
@@ -123,10 +112,8 @@ static int mei_gsc_proxy_component_match(struct device *dev, int subcomponent,
 {
 	struct device *base = data;
 
-	if (!dev)
-		return 0;
-
-	if (strcmp(dev->driver->name, "i915") ||
+	if (!dev || !dev->driver ||
+	    strcmp(dev->driver->name, "i915") ||
 	    subcomponent != I915_COMPONENT_GSC_PROXY)
 		return 0;
 
@@ -144,7 +131,7 @@ static int mei_gsc_proxy_probe(struct mei_cl_device *cldev,
 			     const struct mei_cl_device_id *id)
 {
 	struct i915_gsc_proxy_component *comp_master;
-	struct component_match *master_match;
+	struct component_match *master_match = NULL;
 	int ret;
 
 	ret = mei_cldev_enable(cldev);
@@ -159,7 +146,6 @@ static int mei_gsc_proxy_probe(struct mei_cl_device *cldev,
 		goto err_exit;
 	}
 
-	master_match = NULL;
 	component_match_add_typed(&cldev->dev, &master_match,
 				  mei_gsc_proxy_component_match, &cldev->dev);
 	if (IS_ERR_OR_NULL(master_match)) {
@@ -200,7 +186,7 @@ static void mei_gsc_proxy_remove(struct mei_cl_device *cldev)
 		dev_warn(&cldev->dev, "mei_cldev_disable() failed %d\n", ret);
 }
 
-#define MEI_GUID_GSC_PROXY GUID_INIT(0xf73db04, 0x97ab, 0x4125, \
+#define MEI_GUID_GSC_PROXY UUID_LE(0xf73db04, 0x97ab, 0x4125, \
 				   0xb8, 0x93, 0xe9, 0x4, 0xad, 0xd, 0x54, 0x64)
 
 static struct mei_cl_device_id mei_gsc_proxy_tbl[] = {
